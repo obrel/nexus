@@ -1,0 +1,46 @@
+app:
+  id: nexus-dev
+  env: development
+  version: 1.0.0
+
+http:
+  port: 8080
+  jwt_secret: "dev-secret-key-change-in-production"
+  internal_api_key: "dev-internal-key-change-in-production"
+  max_body_size: 1048576    # 1MB
+  max_header_bytes: 1048576  # 1MB
+
+ws:
+  port: 8081
+  ping_period: 30           # seconds
+  pong_wait: 90             # seconds
+  write_wait: 10            # seconds
+  presence_ttl: 60          # seconds
+
+mysql:
+  host: localhost
+  port: 3306
+  user: root
+  password: password
+  dbname: nexus
+  max_open_conns: 100
+  max_idle_conns: 25
+  conn_max_lifetime: 300    # seconds
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+
+nats:
+  url: nats://localhost:4222
+  sub_pending_msgs_limit: 65536
+  sub_pending_bytes_limit: 67108864 # 64MB
+
+log:
+  level: debug
+  format: text
+
+worker:
+  batch_size: 50
+  poll_interval: 1000       # milliseconds

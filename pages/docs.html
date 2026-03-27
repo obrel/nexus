@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus | Developer Documentation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.mermaid = mermaid;
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+        });
+    </script>
+    <style>
+        :root {
+            --bg-main: #fbfbfb;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --text-main: #111111;
+            --text-muted: #666666;
+            --accent: #0070f3;
+            --accent-hover: #0761d1;
+            --border: #eaeaea;
+            --code-bg: #f6f8fa;
+            --sidebar-width: 280px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            line-height: 1.6;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        aside {
+            width: var(--sidebar-width);
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            height: 100%;
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.05em;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.4rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-toggle:hover {
+            background-color: rgba(56, 189, 248, 0.1);
+        }
+
+        nav {
+            padding: 1.5rem 0;
+            flex-grow: 1;
+        }
+
+        nav h3 {
+            padding: 0 1.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+        }
+
+        nav ul {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        nav a {
+            display: block;
+            padding: 0.5rem 1.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        nav a:hover {
+            color: var(--accent);
+            background-color: rgba(0, 112, 243, 0.05);
+        }
+
+        nav a.active {
+            color: var(--accent);
+            background-color: rgba(0, 112, 243, 0.05);
+            border-left-color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        main {
+            flex-grow: 1;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            padding: 3rem 4rem;
+        }
+
+        .content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        section {
+            padding-bottom: 4rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4rem;
+        }
+
+        section:last-child {
+            border-bottom: none;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.05em;
+            color: var(--text-main);
+        }
+
+        h2 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin: 2.5rem 0 1.25rem;
+            letter-spacing: -0.025em;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 1.5rem 0 1rem;
+        }
+
+        p {
+            margin-bottom: 1.25rem;
+            color: var(--text-muted);
+        }
+
+        strong {
+            color: var(--text-main);
+        }
+
+        ul,
+        ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1.25rem;
+            color: var(--text-muted);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Code Blocks */
+        pre {
+            background-color: var(--code-bg);
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.875rem;
+        }
+
+        code {
+            font-family: 'Fira Code', monospace;
+            color: var(--accent);
+            background-color: rgba(0, 112, 243, 0.05);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: var(--text-main);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 0.75rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: rgba(0, 112, 243, 0.03);
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        td {
+            color: var(--text-muted);
+        }
+
+        /* Callouts */
+        .callout {
+            padding: 1rem 1.5rem;
+            border-left: 4px solid var(--accent);
+            background-color: rgba(0, 112, 243, 0.03);
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+            color: var(--text-main);
+        }
+
+        /* Icons */
+        .icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            main {
+                padding: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            aside {
+                width: 100%;
+                height: auto;
+                max-height: 250px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <aside>
+        <div class="sidebar-header">
+            <div class="logo">NE<span>X</span>US</div>
+            <a href="index.html" class="theme-toggle" title="Home">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                </svg>
+            </a>
+        </div>
+        <nav>
+            <h3>Getting Started</h3>
+            <ul>
+                <li><a href="#intro">Introduction</a></li>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#install">Installation</a></li>
+                <li><a href="#migrations">Database Migrations</a></li>
+                <li><a href="#configure">Configuration</a></li>
+                <li><a href="#running">Running Nexus</a></li>
+            </ul>
+
+            <h3>API Reference</h3>
+            <ul>
+                <li><a href="#auth">Authentication</a></li>
+                <li><a href="#messages">Messages</a></li>
+                <li><a href="#groups">Groups</a></li>
+                <li><a href="#history">History</a></li>
+            </ul>
+
+            <h3>WebSockets</h3>
+            <ul>
+                <li><a href="#ws-overview">Overview</a></li>
+                <li><a href="#ws-events">Events (Downstream)</a></li>
+                <li><a href="#ws-indicators">Indicators (Upstream)</a></li>
+            </ul>
+
+            <h3>Project</h3>
+            <ul>
+                <li><a href="#file-ref">File Reference</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <div class="content">
+            <section id="intro">
+                <h1>Nexus Documentation</h1>
+                <p>Welcome to the Nexus developer documentation. Nexus is a high-concurrency, distributed messaging
+                    service designed to scale to millions of concurrent WebSocket connections.</p>
+
+                <div class="callout">
+                    <p><strong>CQRS-Inspired Architecture:</strong> Nexus separates message ingestion (HTTP Ingress)
+                        from message delivery (WebSocket Egress) for maximum scalability.</p>
+                </div>
+
+                <h3>Key Components</h3>
+                <ul>
+                    <li><strong>Ingress Tier</strong>: Stateless HTTP endpoints for command processing.</li>
+                    <li><strong>Egress Tier</strong>: Stateful WebSocket connections for real-time delivery.</li>
+                    <li><strong>Message Bus</strong>: NATS cluster for internal low-latency communication.</li>
+                </ul>
+            </section>
+
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>Nexus is designed for extreme horizontal scalability. By decoupling ingestion from delivery, each
+                    tier can be scaled independently based on load patterns.</p>
+
+                <h3>Architecture</h3>
+                <div class="mermaid">
+                    graph TD
+                    Client[Client/Publisher] -->|HTTP POST| LB[Load Balancer]
+                    LB --> Ingress1[Ingress Node A]
+                    LB --> Ingress2[Ingress Node B]
+
+                    Ingress1 -->|Publish| NATS{NATS Cluster}
+                    Ingress2 -->|Publish| NATS
+
+                    Ingress1 -->|Async Write| MySQL[(MySQL Cluster)]
+                    Ingress2 -->|Async Write| MySQL
+
+                    NATS -->|Subscribe| Egress1[Egress Node X]
+                    NATS -->|Subscribe| Egress2[Egress Node Y]
+
+                    Egress1 -->|WebSocket| UserA[User A]
+                    Egress2 -->|WebSocket| UserB[User B]
+
+                    Egress1 <--> Redis[(Redis Metadata)]
+                        Egress2 <--> Redis[(Redis Metadata)]
+                </div>
+
+                <h3>Message Flow</h3>
+                <p>High-level sequence of a group message being published and delivered.</p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant A as Sender (Client A)
+                    participant I as Ingress (HTTP)
+                    participant N as NATS Bus
+                    participant E as Egress (WS)
+                    participant B as Recipient (Client B)
+
+                    A->>I: 1. POST /v1/messages/send
+                    I->>A: 2. 202 Accepted (message_id)
+
+                    Note over I: Outbox relay publishes to NATS
+                    I->>N: PUB nexus.{app_id}.v1.grp.{shard}.{group_id}
+
+                    N->>E: 3. MSG to Egress Node
+                    E->>B: 4. WS event: MSG_NEW
+
+                    B->>I: 5. POST /v1/messages/ack (status: received)
+                    I->>N: PUB MSG_STATUS to sender's subject
+                    N->>E: 6. Relay to Sender's Egress
+                    E->>A: 7. WS event: MSG_STATUS (received)
+                </div>
+
+                <h3>Presence Management</h3>
+                <p>Nexus tracks user online status via periodic heartbeats over the WebSocket connection.</p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant C as Client (WS)
+                    participant E as Egress Node
+                    participant R as Redis
+                    participant N as NATS Bus
+
+                    C->>E: Connection Established
+                    E->>R: SETEX user:presence:{user_id} 60 online
+                    E->>N: PUB presence.status.{user_id} online
+
+                    loop Every 30s (Heartbeat)
+                    C->>E: Ping / Heartbeat
+                    E->>R: EXPIRE user:presence:{user_id} 60
+                    end
+
+                    C->>E: Connection Closed (Clean)
+                    E->>R: DEL user:presence:{user_id}
+                    E->>N: PUB presence.status.{user_id} offline
+                </div>
+            </section>
+
+            <section id="install">
+                <h2>Installation</h2>
+                <p>To get started with Nexus, ensure you have the following prerequisites installed:</p>
+                <ul>
+                    <li>Go 1.24+</li>
+                    <li>MySQL 8.0+</li>
+                    <li>Redis 7.0+</li>
+                    <li>NATS Server</li>
+                </ul>
+
+                <h3>Clone the Repository</h3>
+                <pre><code>git clone https://github.com/obrel/nexus.git
+cd nexus</code></pre>
+
+                <h3>Setup Configuration</h3>
+                <pre><code>cp config.yaml.example config.yaml</code></pre>
+            </section>
+
+            <section id="migrations">
+                <h2>Database Migrations</h2>
+                <p>Nexus uses <code>golang-migrate</code> to manage database schema versions. The <code>migrate</code>
+                    subcommand provides several tools for state management.</p>
+
+                <h3>Run Pending Migrations</h3>
+                <p>Apply all pending <code>.up.sql</code> files found in <code>db/migrations/</code>.</p>
+                <pre><code>go run ./cmd/nexus migrate up</code></pre>
+
+                <h3>Rollback Last Migration</h3>
+                <p>Rollback the most recent migration step.</p>
+                <pre><code>go run ./cmd/nexus migrate down</code></pre>
+
+                <h3>Check Version</h3>
+                <p>Show the current migration version and check for dirty states.</p>
+                <pre><code>go run ./cmd/nexus migrate version</code></pre>
+
+                <div class="callout">
+                    <p><strong>Note:</strong> If a migration fails and leaves the database in a "dirty" state, you can
+                        clear it using the <code>force</code> command:
+                        <code>go run ./cmd/nexus migrate force &lt;version&gt;</code>.
+                    </p>
+                </div>
+            </section>
+
+            <section id="configure">
+                <h2>Configuration</h2>
+                <p>Nexus uses <strong>Viper</strong> for configuration, supporting <code>config.yaml</code> and
+                    environment variables. Below is the complete reference of available settings.</p>
+
+                <h3>Application</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>app.id</code></td>
+                            <td>string</td>
+                            <td>Unique identifier for this Nexus deployment.</td>
+                        </tr>
+                        <tr>
+                            <td><code>app.env</code></td>
+                            <td>string</td>
+                            <td><code>development</code> or <code>production</code>.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>HTTP Ingress</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>http.port</code></td>
+                            <td>8080</td>
+                            <td>Port for the HTTP Ingress server.</td>
+                        </tr>
+                        <tr>
+                            <td><code>http.jwt_secret</code></td>
+                            <td>-</td>
+                            <td>Secret key for signing and verifying JWTs.</td>
+                        </tr>
+                        <tr>
+                            <td><code>http.internal_api_key</code></td>
+                            <td>-</td>
+                            <td>Shared secret for internal service-to-service calls (required in production, min 32 chars).</td>
+                        </tr>
+                        <tr>
+                            <td><code>http.max_body_size</code></td>
+                            <td>1MB</td>
+                            <td>Maximum size for request bodies.</td>
+                        </tr>
+                        <tr>
+                            <td><code>http.max_header_bytes</code></td>
+                            <td>1MB</td>
+                            <td>Maximum size for HTTP headers.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>WebSocket Egress</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>ws.port</code></td>
+                            <td>8081</td>
+                            <td>Port for the WebSocket server.</td>
+                        </tr>
+                        <tr>
+                            <td><code>ws.ping_period</code></td>
+                            <td>30s</td>
+                            <td>Interval for sending pings to clients.</td>
+                        </tr>
+                        <tr>
+                            <td><code>ws.pong_wait</code></td>
+                            <td>90s</td>
+                            <td>Time allowed to read the next pong from a client.</td>
+                        </tr>
+                        <tr>
+                            <td><code>ws.write_wait</code></td>
+                            <td>10s</td>
+                            <td>Time allowed to write a message to a client.</td>
+                        </tr>
+                        <tr>
+                            <td><code>ws.presence_ttl</code></td>
+                            <td>60s</td>
+                            <td>Time before a user is marked offline in Redis.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Infrastructure</h3>
+                <p>Configuring MySQL, Redis, and NATS connections.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>mysql.max_open_conns</code></td>
+                            <td>100</td>
+                            <td>Maximum number of open database connections.</td>
+                        </tr>
+                        <tr>
+                            <td><code>mysql.max_idle_conns</code></td>
+                            <td>25</td>
+                            <td>Maximum number of idle database connections.</td>
+                        </tr>
+                        <tr>
+                            <td><code>nats.sub_pending_msgs_limit</code></td>
+                            <td>65536</td>
+                            <td>Maximum pending messages for a NATS subscription.</td>
+                        </tr>
+                        <tr>
+                            <td><code>nats.sub_pending_bytes_limit</code></td>
+                            <td>64MB</td>
+                            <td>Maximum pending bytes for a NATS subscription.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Background Worker</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>worker.batch_size</code></td>
+                            <td>50</td>
+                            <td>Number of outbox entries to process per poll.</td>
+                        </tr>
+                        <tr>
+                            <td><code>worker.poll_interval</code></td>
+                            <td>1000ms</td>
+                            <td>Interval between outbox polling.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="running">
+                <h2>Running Nexus</h2>
+                <p>Nexus is a single binary with multiple subcommands. In a production environment, you would typically
+                    scale each tier independently.</p>
+
+                <h3>Start HTTP Ingress</h3>
+                <pre><code>go run ./cmd/nexus http</code></pre>
+
+                <h3>Start WebSocket Egress</h3>
+                <pre><code>go run ./cmd/nexus ws</code></pre>
+
+                <h3>Start Background Worker</h3>
+                <p>The worker handles the transactional outbox relay to NATS.</p>
+                <pre><code>go run ./cmd/nexus worker</code></pre>
+
+                <h3>Using Docker Compose</h3>
+                <p>For a quick spin-up including all dependencies:</p>
+                <pre><code>docker compose up --build</code></pre>
+            </section>
+
+            <section id="auth">
+                <h2>Authentication</h2>
+                <p>Nexus uses JWT (HS256) for authenticating all API requests and WebSocket connections. Tokens
+                    are passed via the <code>Authorization: Bearer &lt;token&gt;</code> header.</p>
+                <p>Nexus does not provide user registration or login flows. Developers implement their own
+                    auth service and use the <a href="#auth-register">internal registration API</a> to sync
+                    users into Nexus.</p>
+
+                <h3>JWT Format</h3>
+                <p>Nexus expects the following JWT claims:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Claim</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>sub</code></td>
+                            <td>string</td>
+                            <td>User ID (returned by the register endpoint).</td>
+                        </tr>
+                        <tr>
+                            <td><code>tid</code></td>
+                            <td>string</td>
+                            <td>Tenant / App ID.</td>
+                        </tr>
+                        <tr>
+                            <td><code>exp</code></td>
+                            <td>number</td>
+                            <td>Expiration time (Unix timestamp).</td>
+                        </tr>
+                        <tr>
+                            <td><code>iat</code></td>
+                            <td>number</td>
+                            <td>Issued at (Unix timestamp).</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Generating a JWT (Self-Managed Auth)</h3>
+                <p>If you manage authentication yourself instead of using the internal registration API,
+                    you can generate JWTs directly using the same <code>http.jwt_secret</code> configured
+                    in Nexus. The user must already exist in the Nexus <code>users</code> table.</p>
+
+                <p><strong>Go:</strong></p>
+                <pre><code>import (
+    "time"
+    "github.com/golang-jwt/jwt/v5"
+)
+
+func GenerateNexusJWT(jwtSecret, appID, userID string) (string, error) {
+    claims := jwt.MapClaims{
+        "sub": userID,
+        "tid": appID,
+        "iat": time.Now().Unix(),
+        "exp": time.Now().Add(24 * time.Hour).Unix(),
+    }
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    return token.SignedString([]byte(jwtSecret))
+}</code></pre>
+
+                <p><strong>Node.js:</strong></p>
+                <pre><code>const jwt = require("jsonwebtoken");
+
+function generateNexusJWT(jwtSecret, appID, userID) {
+  return jwt.sign(
+    { sub: userID, tid: appID },
+    jwtSecret,
+    { expiresIn: "24h" }
+  );
+}</code></pre>
+
+                <p><strong>Python:</strong></p>
+                <pre><code>import jwt, time
+
+def generate_nexus_jwt(jwt_secret: str, app_id: str, user_id: str) -> str:
+    now = int(time.time())
+    payload = {
+        "sub": user_id,
+        "tid": app_id,
+        "iat": now,
+        "exp": now + 86400,  # 24 hours
+    }
+    return jwt.encode(payload, jwt_secret, algorithm="HS256")</code></pre>
+
+                <div class="callout">
+                    <p><strong>Important:</strong> The <code>jwt_secret</code> must match the value configured
+                        in the Nexus server (<code>http.jwt_secret</code>). In production, use a strong secret
+                        of at least 32 characters.</p>
+                </div>
+
+                <h3 id="auth-register">Internal Registration (Service-to-Service)</h3>
+                <p>Developers implement their own auth service and use this internal API to sync users
+                    into the Nexus <code>users</code> table. The endpoint creates the user if they don't
+                    exist and returns a JWT.</p>
+                <p>Authenticated via <code>X-Internal-Key</code> header instead of JWT.</p>
+                <pre><code>POST /internal/v1/auth/register
+X-Internal-Key: your-internal-api-key
+
+{
+  "email": "user@example.com",
+  "name": "John Doe",
+  "app_id": "myapp"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "420158066212864"
+  }
+}</code></pre>
+                <div class="callout">
+                    <p><strong>Note:</strong> This endpoint is for service-to-service calls only.
+                        The <code>X-Internal-Key</code> must match the configured <code>http.internal_api_key</code>.
+                        If the user already exists, the existing record is used and a fresh JWT is returned.
+                        <code>name</code> and <code>app_id</code> are optional.</p>
+                </div>
+            </section>
+
+            <section id="messages">
+                <h2>Messages API</h2>
+                <p>All message operations are performed via the Ingress HTTP API. The same endpoint handles both group
+                    and private messages.</p>
+
+                <h3>Send Group Message</h3>
+                <p>The sender must be a member of the target group. Non-members receive
+                    <code>403 Forbidden</code> with error code <code>not_a_member</code>.</p>
+                <pre><code>POST /v1/messages/send
+{
+  "group_id": "nexus_dev",
+  "content": { "type": "text", "text": "Hello World!" }
+}</code></pre>
+
+                <h3>Send Private Message</h3>
+                <p>Use <code>user_id</code> instead of <code>group_id</code> to send a direct message to a
+                    specific user. No membership check is required for private messages.</p>
+                <pre><code>POST /v1/messages/send
+{
+  "user_id": "420158066212864",
+  "content": { "type": "text", "text": "Hey, are you available?" }
+}</code></pre>
+
+                <div class="callout">
+                    <p><strong>Note:</strong> <code>group_id</code> and <code>user_id</code> are mutually exclusive
+                        — exactly one must be provided. Group messages require membership; private messages are
+                        delivered via the recipient's private WebSocket subscription.</p>
+                </div>
+
+                <h3>Edit Message</h3>
+                <p>Edit the content of a message you sent. Only the original sender can edit their own messages.</p>
+                <pre><code>POST /v1/messages/edit
+{
+  "message_id": "420158066278400",
+  "content": { "type": "text", "text": "Updated message content" }
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h3>Delete Message</h3>
+                <p>Soft-delete a message you sent. Only the original sender can delete their own messages.
+                    A <code>MSG_UPDATED</code> event with <code>"action": "deleted"</code> is broadcast to recipients.</p>
+                <pre><code>POST /v1/messages/delete
+{
+  "message_id": "420158066278400"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h3>Acknowledge Message</h3>
+                <p>Signal that a message has been received or read. Works for both group and private messages.
+                    Valid statuses: <code>received</code>, <code>read</code>.</p>
+                <pre><code>POST /v1/messages/ack
+{
+  "message_id": "420158066278400",
+  "status": "read"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": {}
+}</code></pre>
+            </section>
+
+            <section id="groups">
+                <h2>Groups API</h2>
+
+                <h3>Create Group</h3>
+                <pre><code>POST /v1/groups/create
+{
+  "group_id": "nexus_dev",
+  "name": "Nexus Development"
+}</code></pre>
+
+                <h3>Get Group Detail</h3>
+                <p>Retrieve group details including the creator. Only group members can view group details.</p>
+                <pre><code>GET /v1/groups/detail?group_id=nexus_dev
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "group_id": "nexus_dev",
+    "name": "Nexus Development",
+    "description": "Main development channel",
+    "created_by": "420158066212864",
+    "created_at": "2026-03-22T10:00:00Z"
+  }
+}</code></pre>
+
+                <h3>Update Group</h3>
+                <p>Update a group's name and/or description. Only group members can update a group.
+                    Non-members receive <code>403 Forbidden</code> with error code <code>not_a_member</code>.</p>
+                <pre><code>POST /v1/groups/update
+{
+  "group_id": "nexus_dev",
+  "name": "Nexus Core",
+  "description": "Main development channel"
+}</code></pre>
+
+                <h3>Join Group</h3>
+                <p>Joining a group automatically triggers a WebSocket subscription for the user.
+                    A <code>USR_JOINED</code> event is broadcast to existing group members.</p>
+                <pre><code>POST /v1/groups/join
+{
+  "group_id": "nexus_dev"
+}</code></pre>
+
+                <h3>Leave Group</h3>
+                <p>Leaving a group removes the user's membership and unsubscribes them from the group's
+                    shard if they have no other groups on that shard.</p>
+                <pre><code>POST /v1/groups/leave
+{
+  "group_id": "nexus_dev"
+}</code></pre>
+            </section>
+
+            <section id="history">
+                <h2>History API</h2>
+                <p>Retrieve message history for a group or private conversation.</p>
+
+                <h3>Group History</h3>
+                <pre><code>GET /v1/history?group_id=nexus_dev&since_id=0&limit=25</code></pre>
+
+                <h3>Private History</h3>
+                <p>Use <code>user_id</code> to fetch the conversation history between you and another user.</p>
+                <pre><code>GET /v1/history?user_id=420158066212864&since_id=0&limit=25</code></pre>
+
+                <div class="callout">
+                    <p><strong>Note:</strong> <code>group_id</code> and <code>user_id</code> are mutually exclusive.
+                        Group history requires group membership. Private history is accessible by both participants.</p>
+                </div>
+            </section>
+
+            <section id="ws-overview">
+                <h2>WebSocket Integration</h2>
+                <p>Connection to the Egress tier is required to receive real-time updates. The Egress tier is
+                    responsible for pushing events to clients.</p>
+
+                <h3>Connection URL</h3>
+                <pre><code>ws://localhost:8081/ws</code></pre>
+
+                <div class="callout">
+                    <p><strong>Note:</strong> Authentication is typically handled via subprotocols or query parameters
+                        if headers are not supported by the client library during the handshake.</p>
+                </div>
+            </section>
+
+            <section id="ws-events">
+                <h2>Downstream Events</h2>
+                <p>Nexus pushes events to connected clients in a standard JSON envelope:</p>
+                <pre><code>{
+  "event": "EVENT_TYPE",
+  "data": { ... }
+}</code></pre>
+
+                <h3>MSG_NEW</h3>
+                <p>A new message has been posted to a group or received as a private message.</p>
+                <pre><code>{
+  "event": "MSG_NEW",
+  "data": {
+    "message_id": "420158066278400",
+    "recipient_type": "group",
+    "recipient_id": "nexus_dev",
+    "sender_type": "user",
+    "sender_id": "420158066212864",
+    "content": { "type": "text", "text": "Hello everyone!" }
+  }
+}</code></pre>
+                <div class="callout">
+                    <p><strong>Note:</strong> For private messages, <code>recipient_type</code> is <code>"user"</code>
+                        and <code>recipient_id</code> is the target user's ID.
+                        The <code>content</code> field is a JSON object; currently only <code>"type": "text"</code> is
+                        supported.</p>
+                </div>
+
+                <h3>MSG_UPDATED</h3>
+                <p>A message has been edited or deleted. The <code>action</code> field indicates which operation
+                    occurred.</p>
+                <pre><code>// Edited
+{
+  "event": "MSG_UPDATED",
+  "data": {
+    "message_id": "420158066278400",
+    "recipient_type": "group",
+    "recipient_id": "nexus_dev",
+    "content": { "type": "text", "text": "Hello everyone! (edited)" },
+    "action": "edited"
+  }
+}
+
+// Deleted
+{
+  "event": "MSG_UPDATED",
+  "data": {
+    "message_id": "420158066278400",
+    "recipient_type": "group",
+    "recipient_id": "nexus_dev",
+    "action": "deleted"
+  }
+}</code></pre>
+
+                <h3>MSG_STATUS</h3>
+                <p>Receipt or read status update for a message. Delivered to the original sender's private
+                    WebSocket subscription.</p>
+                <pre><code>{
+  "event": "MSG_STATUS",
+  "data": {
+    "message_id": "420158066278400",
+    "status": "read",
+    "user_id": "420158066212864"
+  }
+}</code></pre>
+                <div class="callout">
+                    <p><strong>Note:</strong> <code>user_id</code> is the user who acknowledged the message.
+                        <code>status</code> is either <code>"received"</code> or <code>"read"</code>.
+                    </p>
+                </div>
+
+                <h3>USR_JOINED</h3>
+                <p>A new user joined the group. Broadcast to all current group members.</p>
+                <pre><code>{
+  "event": "USR_JOINED",
+  "data": {
+    "group_id": "nexus_dev",
+    "user_id": "420158066212864"
+  }
+}</code></pre>
+
+                <h3>TYP_INDICATOR</h3>
+                <p>Real-time typing status change. Broadcast to the group or delivered to the private recipient.</p>
+                <pre><code>// Group typing
+{
+  "event": "TYP_INDICATOR",
+  "data": {
+    "recipient_type": "group",
+    "recipient_id": "nexus_dev",
+    "user_id": "420158066212864",
+    "typing": true
+  }
+}
+
+// Private typing
+{
+  "event": "TYP_INDICATOR",
+  "data": {
+    "recipient_type": "user",
+    "recipient_id": "420158066212865",
+    "user_id": "420158066212864",
+    "typing": false
+  }
+}</code></pre>
+            </section>
+
+            <section id="ws-indicators">
+                <h2>Upstream Indicators</h2>
+                <p>Typing indicators are the only messages sent <strong>upstream</strong> via the WebSocket connection.
+                    Use <code>group_id</code> for group typing or <code>user_id</code> for private typing.</p>
+
+                <h3>Start Typing (Group)</h3>
+                <pre><code>{
+  "request": "TYP_START",
+  "data": { "group_id": "nexus_dev" }
+}</code></pre>
+
+                <h3>Start Typing (Private)</h3>
+                <pre><code>{
+  "request": "TYP_START",
+  "data": { "user_id": "420158066212864" }
+}</code></pre>
+
+                <h3>Stop Typing</h3>
+                <pre><code>{
+  "request": "TYP_STOP",
+  "data": { "group_id": "nexus_dev" }
+}
+// or
+{
+  "request": "TYP_STOP",
+  "data": { "user_id": "420158066212864" }
+}</code></pre>
+            </section>
+
+            <section id="file-ref">
+                <h2>File Reference</h2>
+                <p>Key architectural files in the Nexus codebase. This reference helps navigate the clean architecture
+                    implementation of the service.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>cmd/http.go</code></td>
+                            <td>HTTP Ingress entrypoint — wires MySQL, NATS, and Redis.</td>
+                        </tr>
+                        <tr>
+                            <td><code>cmd/ws.go</code></td>
+                            <td>WS Egress entrypoint — manages stateful connections and heartbeats.</td>
+                        </tr>
+                        <tr>
+                            <td><code>cmd/worker.go</code></td>
+                            <td>Outbox relay worker — ensures at-least-once delivery to NATS.</td>
+                        </tr>
+                        <tr>
+                            <td><code>config/config.go</code></td>
+                            <td>Configuration schema with production-ready defaults and validation.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/domain/models.go</code></td>
+                            <td>Core domain models including Polymorphic Message and Presence.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/domain/repository.go</code></td>
+                            <td>Repository interfaces defining the storage abstraction layer.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/usecase/message.go</code></td>
+                            <td>High-level message operations with transactional outbox support.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/usecase/outbox_relay.go</code></td>
+                            <td>Relay logic with circuit breaker and exponential backoff.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/delivery/http/server.go</code></td>
+                            <td>HTTP server setup, Chi router, and global middleware stack.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/delivery/ws/handler.go</code></td>
+                            <td>WebSocket upgrade logic and connection lifecycle management.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/egress/manager.go</code></td>
+                            <td>In-memory connection tracking and presence synchronization.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/egress/group_registry.go</code></td>
+                            <td>Efficient shard-based wildcard subscriptions using NATS.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/infra/hash/ring.go</code></td>
+                            <td>Consistent hashing for horizontally scaling the Egress tier.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/infra/metrics/metrics.go</code></td>
+                            <td>Prometheus instrumentation for monitoring service health.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/infra/mysql/publish_repo.go</code></td>
+                            <td>Atomic persistence of messages and outbox entries.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // Simple scroll spy and active state for nav
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('nav a');
+        const main = document.querySelector('main');
+
+        main.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionOffset = section.offsetTop;
+                if (main.scrollTop >= sectionOffset - 120) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Initialize active link on load
+        window.addEventListener('load', () => {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                const link = document.querySelector(`nav a[href="#${hash}"]`);
+                if (link) link.classList.add('active');
+            } else if (navLinks.length > 0) {
+                navLinks[0].classList.add('active');
+            }
+        });
+    </script>
+</body>
+
+</html>

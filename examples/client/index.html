@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus | Simple Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fbfbfb;
+      --sidebar-bg: #ffffff;
+      --text-main: #111111;
+      --text-muted: #666666;
+      --accent: #0070f3;
+      --border: #eaeaea;
+      --msg-sent: #0070f3;
+      --msg-received: #f0f0f0;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* Login Selection Overlay */
+    #login-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-box {
+      background: white;
+      padding: 3rem;
+      border-radius: 1.5rem;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .login-box h1 {
+      margin-bottom: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+    }
+
+    .user-options {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .user-btn {
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100px;
+    }
+
+    .user-btn:hover {
+      border-color: var(--accent);
+      transform: translateY(-5px);
+      box-shadow: var(--shadow);
+    }
+
+    .user-btn img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      margin-bottom: 0.5rem;
+    }
+
+    .user-btn span {
+      display: block;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    /* Main Layout */
+    .sidebar {
+      width: 300px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .profile-bar {
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .profile-bar .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+
+    .tab-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 0;
+    }
+
+    .tab-group-header {
+      padding: 0.5rem 1.5rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .add-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .tab {
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: background 0.2s;
+      border-left: 3px solid transparent;
+    }
+
+    .tab:hover {
+      background: #f5f5f5;
+    }
+
+    .tab.active {
+      background: #f0f7ff;
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+
+    .tab .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+
+    .tab .status-dot.online {
+      background: #22c55e;
+    }
+
+    /* Chat Area */
+    .main-chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+
+    .chat-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .chat-header h3 {
+      font-weight: 700;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .msg {
+      max-width: 70%;
+      padding: 0.75rem 1rem;
+      border-radius: 1rem;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      position: relative;
+    }
+
+    .msg.sent {
+      align-self: flex-end;
+      background: var(--msg-sent);
+      color: white;
+      border-bottom-right-radius: 0.2rem;
+    }
+
+    .msg.received {
+      align-self: flex-start;
+      background: var(--msg-received);
+      color: var(--text-main);
+      border-bottom-left-radius: 0.2rem;
+    }
+
+    .msg .sender {
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      opacity: 0.8;
+      display: block;
+    }
+
+    .msg .time {
+      font-size: 0.65rem;
+      opacity: 0.6;
+      margin-top: 0.25rem;
+      display: block;
+      text-align: right;
+    }
+
+    .chat-input-area {
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .chat-input-area input {
+      flex: 1;
+      padding: 0.8rem 1.2rem;
+      border-radius: 2rem;
+      border: 1px solid var(--border);
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    .chat-input-area input:focus {
+      border-color: var(--accent);
+    }
+
+    .send-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 2rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Popup / Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal {
+      background: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      width: 400px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal h2 {
+      margin-bottom: 1rem;
+      letter-spacing: -0.03em;
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 0.8rem;
+      margin-bottom: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border);
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    .modal-btns button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 0.5rem;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-cancel {
+      background: #eee;
+    }
+
+    .btn-confirm {
+      background: var(--accent);
+      color: white;
+    }
+
+    #typing-indicator {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-bottom: 0.5rem;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Login Selection -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h1>Welcome to Nexus</h1>
+      <p style="color: var(--text-muted); margin-bottom: 2rem;">Select a persona to start messaging</p>
+      <div class="user-options">
+        <div class="user-btn" onclick="login('alice')">
+          <div
+            style="width:48px;height:48px;background:#ff4d4f;border-radius:50%;margin:0 auto 0.5rem;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;">
+            A</div>
+          <span>Alice</span>
+        </div>
+        <div class="user-btn" onclick="login('bob')">
+          <div
+            style="width:48px;height:48px;background:#52c41a;border-radius:50%;margin:0 auto 0.5rem;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;">
+            B</div>
+          <span>Bob</span>
+        </div>
+        <div class="user-btn" onclick="login('charlie')">
+          <div
+            style="width:48px;height:48px;background:#1890ff;border-radius:50%;margin:0 auto 0.5rem;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;">
+            C</div>
+          <span>Charlie</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>NEXUS</h2>
+      <div id="connection-status" class="status-dot" title="Connection Status"></div>
+    </div>
+    <div class="profile-bar">
+      <div class="avatar" id="my-avatar">?</div>
+      <div>
+        <div style="font-weight: 600; font-size: 0.9rem;" id="my-name">Guest</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);" id="my-id">...</div>
+      </div>
+    </div>
+
+    <div class="tab-section">
+      <div class="tab-group-header">
+        <span>Groups</span>
+        <button class="add-btn" onclick="showModal('group')">+</button>
+      </div>
+      <div id="group-tabs">
+        <!-- Group tabs added here -->
+      </div>
+
+      <div class="tab-group-header" style="margin-top: 2rem;">
+        <span>Private Messages</span>
+        <button class="add-btn" onclick="showModal('private')">+</button>
+      </div>
+      <div id="private-tabs">
+        <!-- Private tabs added here -->
+      </div>
+    </div>
+  </div>
+
+  <div class="main-chat">
+    <div class="chat-header">
+      <div class="avatar" id="chat-avatar" style="background:#ddd; width:40px; height:40px; border-radius:50%;"></div>
+      <div>
+        <h3 id="chat-title">Select a conversation</h3>
+        <p id="chat-subtitle" style="font-size: 0.8rem; color: var(--text-muted);"></p>
+      </div>
+    </div>
+    <div class="messages" id="messages-container">
+      <div style="margin: auto; text-align: center; color: var(--text-muted);">
+        <p>Welcome! Select a group or user to start chatting.</p>
+      </div>
+    </div>
+    <div class="chat-input-area" id="input-area" style="display: none;">
+      <div style="display: flex; flex-direction: column; flex: 1;">
+        <div id="typing-indicator"></div>
+        <input type="text" id="msg-input" placeholder="Type a message..." onkeydown="handleKeydown(event)"
+          oninput="handleTyping()">
+      </div>
+      <button class="send-btn" onclick="send()">Send</button>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <h2 id="modal-title">Join Group</h2>
+      <input type="text" id="modal-input" placeholder="ID (e.g. general)">
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="hideModal()">Cancel</button>
+        <button class="btn-confirm" id="modal-confirm" onclick="confirmModal()">Join</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG = {
+      http: 'http://localhost:8080',
+      ws: 'ws://localhost:8081',
+      appId: 'nexus-demo',
+      jwtSecret: 'dev-secret-key-change-in-production'
+    };
+
+    let state = {
+      user: null, // {id, name, token}
+      activeTab: null, // {type, id, name}
+      tabs: [], // array of tabs
+      ws: null,
+      isTyping: false,
+      typingTimeout: null
+    };
+
+    // --- Auth ---
+    async function login(persona) {
+      const userId = persona;
+      const name = persona.charAt(0).toUpperCase() + persona.slice(1);
+
+      // Build JWT (using simplified HS256 shim for demo)
+      const token = await signJWT({ sub: userId, tid: CONFIG.appId, exp: Math.floor(Date.now() / 1000) + 86400 }, CONFIG.jwtSecret);
+
+      state.user = { id: userId, name: name, token: token };
+
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('my-name').innerText = name;
+      document.getElementById('my-id').innerText = `@${userId}`;
+      document.getElementById('my-avatar').innerText = userId[0].toUpperCase();
+
+      initWS();
+      loadTabs();
+    }
+
+    // Simplified JWT Signer
+    async function signJWT(payload, secret) {
+      const header = { alg: 'HS256', typ: 'JWT' };
+      const b64 = (obj) => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const segments = b64(header) + '.' + b64(payload);
+      const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(segments));
+      const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return segments + '.' + sigB64;
+    }
+
+    // --- WebSocket ---
+    function initWS() {
+      if (state.ws) state.ws.close();
+      state.ws = new WebSocket(`${CONFIG.ws}/ws`, ['nexus-v1', state.user.token]);
+
+      state.ws.onopen = () => {
+        document.getElementById('connection-status').classList.add('online');
+        console.log('Connected to Nexus');
+      };
+
+      state.ws.onclose = () => {
+        document.getElementById('connection-status').classList.remove('online');
+        setTimeout(initWS, 5000);
+      };
+
+      state.ws.onmessage = (e) => {
+        const event = JSON.parse(e.data);
+        handleEvent(event);
+      };
+    }
+
+    function handleEvent(event) {
+      console.log('Received:', event);
+      if (event.event === 'MSG_NEW') {
+        const msg = event.data;
+        const tabId = msg.recipient_type === 'group' ? msg.recipient_id : (msg.sender_id === state.user.id ? msg.recipient_id : msg.sender_id);
+        const type = msg.recipient_type;
+
+        // Add tab if not exists
+        if (!findTab(type, tabId)) {
+          addTab(type, tabId, tabId, false);
+        }
+
+        if (state.activeTab && state.activeTab.id === tabId && state.activeTab.type === type) {
+          // If this is our own message, check if we already appended it locally
+          const alreadyExists = document.getElementById(`msg-${msg.message_id}`);
+          if (!alreadyExists) {
+            appendMessage(msg, msg.sender_id === state.user.id);
+          }
+        }
+      } else if (event.event === 'TYP_INDICATOR') {
+        const data = event.data;
+        if (state.activeTab && data.typing && data.user_id !== state.user.id) {
+          if ((state.activeTab.type === 'group' && data.recipient_id === state.activeTab.id) ||
+            (state.activeTab.type === 'user' && data.user_id === state.activeTab.id)) {
+            document.getElementById('typing-indicator').innerText = `${data.user_id} is typing...`;
+            setTimeout(() => document.getElementById('typing-indicator').innerText = '', 3000);
+          }
+        }
+      }
+    }
+
+    // --- Tab Management ---
+    function addTab(type, id, name, select = true) {
+      if (findTab(type, id)) {
+        if (select) switchTab(type, id);
+        return;
+      }
+
+      const tab = { type, id, name };
+      state.tabs.push(tab);
+      renderTabs();
+      if (select) switchTab(type, id);
+      saveTabs();
+    }
+
+    function findTab(type, id) {
+      return state.tabs.find(t => t.type === type && t.id === id);
+    }
+
+    function renderTabs() {
+      const gDiv = document.getElementById('group-tabs');
+      const pDiv = document.getElementById('private-tabs');
+      gDiv.innerHTML = '';
+      pDiv.innerHTML = '';
+
+      state.tabs.forEach(t => {
+        const el = document.createElement('div');
+        el.className = `tab ${state.activeTab && state.activeTab.id === t.id && state.activeTab.type === t.type ? 'active' : ''}`;
+        el.onclick = () => switchTab(t.type, t.id);
+        el.innerText = (t.type === 'group' ? '# ' : '@ ') + t.name;
+
+        if (t.type === 'group') gDiv.appendChild(el);
+        else pDiv.appendChild(el);
+      });
+    }
+
+    async function switchTab(type, id) {
+      const tab = findTab(type, id);
+      state.activeTab = tab;
+      renderTabs();
+
+      document.getElementById('chat-title').innerText = (type === 'group' ? '# ' : '@ ') + tab.name;
+      document.getElementById('chat-subtitle').innerText = type === 'group' ? 'Public Room' : 'Private Conversation';
+      document.getElementById('input-area').style.display = 'flex';
+      document.getElementById('messages-container').innerHTML = '';
+
+      // Load History
+      const fetchHistory = async () => {
+        const url = `${CONFIG.http}/v1/history?${type}_id=${id}&limit=50`;
+        return fetch(url, { headers: { 'Authorization': `Bearer ${state.user.token}` } });
+      };
+
+      let res = await fetchHistory();
+
+      // If 403 Forbidden for a group, try to join automatically then retry
+      if (res.status === 403 && type === 'group') {
+        console.warn(`Access denied for ${id}. Attempting auto-join...`);
+        // Ensure group exists then join
+        await fetch(`${CONFIG.http}/v1/groups/create`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: id, name: id })
+        });
+        await fetch(`${CONFIG.http}/v1/groups/join`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: id })
+        });
+        res = await fetchHistory();
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        const messages = data.data?.messages;
+        if (Array.isArray(messages)) {
+          messages.forEach(m => appendMessage(m, m.sender_id === state.user.id));
+        }
+      } else {
+        console.error(`Failed to fetch history for ${id}: ${res.status}`);
+      }
+    }
+
+    // --- Modals ---
+    let modalMode = 'group';
+    function showModal(mode) {
+      modalMode = mode;
+      document.getElementById('modal-title').innerText = mode === 'group' ? 'Join or Create Group' : 'New Private Message';
+      document.getElementById('modal-input').placeholder = mode === 'group' ? 'group_id (e.g. general)' : 'user_id (e.g. bob)';
+      document.getElementById('modal-confirm').innerText = mode === 'group' ? 'Join' : 'Start';
+      document.getElementById('modal-overlay').style.display = 'flex';
+      document.getElementById('modal-input').focus();
+    }
+
+    function hideModal() {
+      document.getElementById('modal-overlay').style.display = 'none';
+      document.getElementById('modal-input').value = '';
+    }
+
+    async function confirmModal() {
+      const val = document.getElementById('modal-input').value.trim();
+      if (!val) return;
+
+      if (modalMode === 'group') {
+        // Ensure group exists
+        await fetch(`${CONFIG.http}/v1/groups/create`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: val, name: val })
+        });
+
+        // Join
+        const res = await fetch(`${CONFIG.http}/v1/groups/join`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: val })
+        });
+
+        if (res.ok) addTab('group', val, val);
+      } else {
+        addTab('user', val, val);
+      }
+      hideModal();
+    }
+
+    // --- Messaging ---
+    function appendMessage(msg, isSent) {
+      const container = document.getElementById('messages-container');
+      const msgId = msg.message_id || `local-${Date.now()}`;
+
+      // Prevent duplicates
+      if (document.getElementById(`msg-${msgId}`)) return;
+
+      const el = document.createElement('div');
+      el.id = `msg-${msgId}`;
+      el.className = `msg ${isSent ? 'sent' : 'received'}`;
+
+      const content = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+      const text = content.text || content.content || JSON.stringify(content);
+
+      el.innerHTML = `
+                ${!isSent ? `<span class="sender">${msg.sender_id}</span>` : ''}
+                <div>${text}</div>
+                <span class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            `;
+      container.appendChild(el);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function send() {
+      const input = document.getElementById('msg-input');
+      const text = input.value.trim();
+      if (!text || !state.activeTab) return;
+
+      const body = {
+        content: { type: 'text', text: text },
+        [state.activeTab.type === 'group' ? 'group_id' : 'user_id']: state.activeTab.id
+      };
+
+      input.value = '';
+
+      const res = await fetch(`${CONFIG.http}/v1/messages/send`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        // Appending locally for instant feedback
+        const data = await res.json();
+        appendMessage({
+          message_id: data.data.message_id,
+          sender_id: state.user.id,
+          content: body.content
+        }, true);
+      } else {
+        alert('Failed to send message');
+      }
+    }
+
+    function handleKeydown(e) {
+      if (e.key === 'Enter') send();
+    }
+
+    function handleTyping() {
+      if (!state.isTyping && state.ws && state.activeTab) {
+        state.isTyping = true;
+        state.ws.send(JSON.stringify({
+          request: 'TYP_START',
+          data: { [state.activeTab.type === 'group' ? 'group_id' : 'user_id']: state.activeTab.id }
+        }));
+      }
+      clearTimeout(state.typingTimeout);
+      state.typingTimeout = setTimeout(() => {
+        state.isTyping = false;
+        if (state.ws && state.activeTab) {
+          state.ws.send(JSON.stringify({
+            request: 'TYP_STOP',
+            data: { [state.activeTab.type === 'group' ? 'group_id' : 'user_id']: state.activeTab.id }
+          }));
+        }
+      }, 3000);
+    }
+
+    // --- Persistence ---
+    function saveTabs() {
+      localStorage.setItem(`nexus_tabs_${state.user.id}`, JSON.stringify(state.tabs));
+    }
+    function loadTabs() {
+      const saved = localStorage.getItem(`nexus_tabs_${state.user.id}`);
+      if (saved) {
+        state.tabs = JSON.parse(saved);
+        renderTabs();
+      } else {
+        // Default tab
+        addTab('group', 'room_general', 'General', false);
+      }
+    }
+  </script>
+</body>
+
+</html>

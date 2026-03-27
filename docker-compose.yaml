@@ -1,0 +1,32 @@
+services:
+  nexus-http:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["http"]
+    network_mode: "host"
+    environment:
+      - APP_ENV=development
+      - HTTP_PORT=8080
+    restart: always
+
+  nexus-ws:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["ws"]
+    network_mode: "host"
+    environment:
+      - APP_ENV=development
+      - WS_PORT=8081
+    restart: always
+
+  nexus-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["worker"]
+    network_mode: "host"
+    environment:
+      - APP_ENV=development
+    restart: always

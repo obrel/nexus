@@ -1,0 +1,1165 @@
+openapi: "3.0.3"
+info:
+  title: Nexus Messaging API
+  description: |
+    Nexus is a high-concurrency WebSocket messaging service with a CQRS-inspired architecture.
+
+    **Architecture Overview:**
+    - **Ingress Tier** (this API): Stateless HTTP endpoints for sending messages, managing groups, user profiles, and authentication.
+    - **Egress Tier**: Stateful WebSocket connections for real-time event delivery (MSG_NEW, MSG_UPDATED, MSG_STATUS, USR_JOINED, USR_LEFT, TYP_INDICATOR).
+    - **NATS Cluster**: Internal message bus connecting Ingress and Egress tiers.
+
+    **Authentication:**
+    All protected endpoints require a JWT token. Nexus does not provide registration or login flows —
+    developers implement their own auth service and use the internal API to sync users into Nexus.
+    Pass the token in the `Authorization: Bearer <token>` header.
+  version: "1.0.0"
+  contact:
+    name: Nexus Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Operational
+    description: Health, readiness, and metrics endpoints
+  - name: Auth
+    description: Internal user registration and JWT issuance
+  - name: Messages
+    description: Message lifecycle — send, edit, delete, acknowledge
+  - name: Groups
+    description: Group management and membership
+  - name: Profile
+    description: User profile management
+  - name: History
+    description: Message history sync
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token with claims:
+        - `sub` (string): user ID
+        - `tid` (string): tenant/app ID
+        - `iat` (int): issued at
+        - `exp` (int): expiration (24h from issue)
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required:
+        - success
+        - data
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Machine-readable error code
+      required:
+        - success
+        - message
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: uint64
+          description: Snowflake message ID
+          example: 420158066278400
+        app_id:
+          type: string
+          example: "myapp"
+        recipient_type:
+          type: string
+          enum: [group, user]
+          description: "Type of recipient: 'group' for group messages, 'user' for private messages"
+          example: "group"
+        recipient_id:
+          type: string
+          description: Target identifier (group ID when recipient_type is group, user ID when user)
+          example: "nexus_dev_team"
+        shard_id:
+          type: integer
+          example: 42
+        content:
+          type: object
+          description: Structured message content (JSON)
+          example: { "type": "text", "text": "Hello, world!" }
+        sender_type:
+          type: string
+          enum: [user]
+          description: "Type of sender (currently only 'user')"
+          example: "user"
+        sender_id:
+          type: string
+          description: Sender identifier (user ID when sender_type is user)
+          example: "420158066212864"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-24T10:30:00Z"
+
+    UserProfile:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: "420158066212864"
+        app_id:
+          type: string
+          example: "myapp"
+        email:
+          type: string
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        bio:
+          type: string
+          example: "Software engineer"
+        private_topic:
+          type: string
+          description: NATS subject for private messages
+          example: "nexus.myapp.v1.user.420158066212864"
+        created_at:
+          type: string
+          format: date-time
+
+    GroupDetail:
+      type: object
+      properties:
+        group_id:
+          type: string
+          example: "nexus_dev_team"
+        name:
+          type: string
+          example: "Nexus Dev Team"
+        description:
+          type: string
+          example: "Main development channel"
+        created_by:
+          type: string
+          description: User ID of the group creator
+          example: "420158066212864"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-24T10:00:00Z"
+
+paths:
+  /health:
+    get:
+      tags: [Operational]
+      summary: Liveness check
+      description: Returns 200 if the process is alive. No dependency checks.
+      operationId: health
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /ready:
+    get:
+      tags: [Operational]
+      summary: Readiness check
+      description: |
+        Returns 200 only if all critical dependencies (MySQL, Redis, NATS) are reachable.
+        Returns 503 if any dependency is unavailable.
+      operationId: ready
+      responses:
+        "200":
+          description: All dependencies are healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ready"
+                  checks:
+                    type: object
+                    properties:
+                      mysql:
+                        type: string
+                        example: "ok"
+                      redis:
+                        type: string
+                        example: "ok"
+                      nats:
+                        type: string
+                        example: "ok"
+        "503":
+          description: One or more dependencies are unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "not_ready"
+                  checks:
+                    type: object
+
+  /metrics:
+    get:
+      tags: [Operational]
+      summary: Prometheus metrics
+      description: Exposes Prometheus-format metrics for monitoring.
+      operationId: metrics
+      responses:
+        "200":
+          description: Prometheus metrics in text format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /internal/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register or retrieve a user (internal)
+      description: |
+        Service-to-service endpoint for syncing users from an external auth service into Nexus.
+        Creates the user if they don't exist, or retrieves them if they do, and returns a JWT.
+        Authenticated via `X-Internal-Key` header.
+      operationId: registerUser
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+          description: Internal API key configured via `http.internal_api_key`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                name:
+                  type: string
+                  description: Display name (optional, set on newly created users)
+                  example: "John Doe"
+                app_id:
+                  type: string
+                  description: Tenant ID (defaults to server's configured app ID if omitted)
+                  example: "myapp"
+      responses:
+        "200":
+          description: User registered or retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        description: JWT token (valid for 24 hours)
+                        example: "eyJhbGciOiJIUzI1NiIs..."
+                      user_id:
+                        type: string
+                        example: "420158066212864"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_json:
+                  value: { "success": false, "message": "invalid_json" }
+                email_required:
+                  value: { "success": false, "message": "email_required" }
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "invalid_internal_key" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "register_failed" }
+
+  /v1/messages/send:
+    post:
+      tags: [Messages]
+      summary: Send a message
+      description: |
+        Sends a message to a group or a specific user. The message is persisted with a
+        Snowflake ID and queued via the transactional outbox for delivery through NATS.
+        For group messages, the sender must be a member of the target group.
+        `group_id` and `user_id` are mutually exclusive — exactly one must be provided.
+      operationId: sendMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                group_id:
+                  type: string
+                  description: Target group ID (mutually exclusive with user_id)
+                  example: "nexus_dev_team"
+                user_id:
+                  type: string
+                  description: Target user ID for private message (mutually exclusive with group_id)
+                  example: "420158066212864"
+                content:
+                  type: object
+                  description: Structured message content (JSON object)
+                  example: { "type": "text", "text": "Hello everyone!" }
+      responses:
+        "202":
+          description: Message accepted for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message_id:
+                        type: string
+                        description: Snowflake message ID
+                        example: "420158066278400"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                group_id_or_user_id_required:
+                  value: { "success": false, "message": "group_id_or_user_id_required" }
+                mutually_exclusive:
+                  value: { "success": false, "message": "group_id_and_user_id_are_mutually_exclusive" }
+                content_required:
+                  value: { "success": false, "message": "content_required" }
+                cannot_message_self:
+                  value: { "success": false, "message": "cannot_message_self" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not a member of the target group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_member" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "send_failed" }
+
+  /v1/messages/edit:
+    post:
+      tags: [Messages]
+      summary: Edit a message
+      description: |
+        Edits the content of an existing message. Only the original sender can
+        edit their message. A MSG_UPDATED event is broadcast to all group members.
+      operationId: editMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_id, content]
+              properties:
+                message_id:
+                  type: string
+                  description: Snowflake ID of the message to edit
+                  example: "420158066278400"
+                content:
+                  type: object
+                  description: Updated message content (JSON object)
+                  example: { "type": "text", "text": "Hello everyone! (edited)" }
+      responses:
+        "200":
+          description: Message edited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message_id:
+                        type: string
+                        example: "420158066278400"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "edit_failed" }
+
+  /v1/messages/delete:
+    post:
+      tags: [Messages]
+      summary: Delete a message
+      description: |
+        Soft-deletes a message. Only the original sender can delete their message.
+        A MSG_UPDATED event is broadcast to notify group members.
+      operationId: deleteMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_id]
+              properties:
+                message_id:
+                  type: string
+                  description: Snowflake ID of the message to delete
+                  example: "420158066278400"
+      responses:
+        "200":
+          description: Message deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message_id:
+                        type: string
+                        example: "420158066278400"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "delete_failed" }
+
+  /v1/messages/ack:
+    post:
+      tags: [Messages]
+      summary: Acknowledge a message
+      description: |
+        Updates the delivery status of a message for the authenticated user.
+        Valid statuses are `received` (delivered to device) and `read` (user has read it).
+        A MSG_STATUS event is sent to the message sender via the transactional outbox.
+      operationId: ackMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_id, status]
+              properties:
+                message_id:
+                  type: string
+                  description: Snowflake ID of the message to acknowledge
+                  example: "420158066278400"
+                status:
+                  type: string
+                  enum: [received, read]
+                  description: Delivery status
+                  example: "read"
+      responses:
+        "200":
+          description: Acknowledgement recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_status:
+                  value: { "success": false, "message": "invalid_status" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "ack_failed" }
+
+  /v1/groups/create:
+    post:
+      tags: [Groups]
+      summary: Create a group
+      description: |
+        Creates a new group with a name, optional description, and a shard ID
+        computed via the consistent hash ring. The `created_by` field is set to
+        the authenticated user. The creator is automatically added as a member.
+        Returns 409 if the group already exists.
+      operationId: createGroup
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id, name]
+              properties:
+                group_id:
+                  type: string
+                  description: Unique identifier for the new group
+                  example: "nexus_dev_team"
+                name:
+                  type: string
+                  description: Display name for the group
+                  example: "Nexus Dev Team"
+                description:
+                  type: string
+                  description: Optional group description
+                  example: "Main development channel"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                group_id_required:
+                  value: { "success": false, "message": "group_id_required" }
+                name_required:
+                  value: { "success": false, "message": "name_required" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Group already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_already_exists" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "create_failed" }
+
+  /v1/groups/detail:
+    get:
+      tags: [Groups]
+      summary: Get group detail
+      description: |
+        Returns the details of a group including its creator. The authenticated user
+        must be a member of the group. Returns 403 if not a member, 404 if the group
+        does not exist.
+      operationId: getGroupDetail
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: group_id
+          in: query
+          required: true
+          description: ID of the group to retrieve
+          schema:
+            type: string
+          example: "nexus_dev_team"
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/GroupDetail"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                group_id_required:
+                  value: { "success": false, "message": "group_id_required" }
+                invalid_group_id:
+                  value: { "success": false, "message": "invalid_group_id" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not a member of the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_member" }
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_not_found" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "get_failed" }
+
+  /v1/groups/update:
+    post:
+      tags: [Groups]
+      summary: Update a group
+      description: |
+        Updates the name and/or description of an existing group. The authenticated user
+        must be a member of the group. Returns 403 if not a member, 404 if the group
+        does not exist.
+      operationId: updateGroup
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id]
+              properties:
+                group_id:
+                  type: string
+                  description: ID of the group to update
+                  example: "nexus_dev_team"
+                name:
+                  type: string
+                  description: Updated display name
+                  example: "Nexus Core Team"
+                description:
+                  type: string
+                  description: Updated description
+                  example: "Core engineering channel"
+      responses:
+        "200":
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not a member of the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_member" }
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_not_found" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "update_failed" }
+
+  /v1/groups/join:
+    post:
+      tags: [Groups]
+      summary: Join a group
+      description: |
+        Adds the authenticated user to the specified group. The group must exist
+        (created via `/v1/groups/create`). A USR_JOINED event is broadcast to
+        existing group members. A control message is sent via NATS to the user's
+        Egress node to subscribe to the group's shard subject.
+      operationId: joinGroup
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id]
+              properties:
+                group_id:
+                  type: string
+                  description: ID of the group to join
+                  example: "nexus_dev_team"
+      responses:
+        "200":
+          description: Joined group
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_not_found" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "join_failed" }
+
+  /v1/groups/leave:
+    post:
+      tags: [Groups]
+      summary: Leave a group
+      description: |
+        Removes the authenticated user from the specified group. A USR_LEFT event is
+        broadcast to remaining group members. A control message notifies the user's
+        Egress node to unsubscribe from the group's shard subject.
+      operationId: leaveGroup
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id]
+              properties:
+                group_id:
+                  type: string
+                  description: ID of the group to leave
+                  example: "nexus_dev_team"
+      responses:
+        "200":
+          description: Left group
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "leave_failed" }
+
+  /v1/profile:
+    get:
+      tags: [Profile]
+      summary: Get user profile
+      description: Returns the authenticated user's profile.
+      operationId: getProfile
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "profile_get_failed" }
+
+    post:
+      tags: [Profile]
+      summary: Update user profile
+      description: Updates the authenticated user's name and/or bio.
+      operationId: updateProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Display name
+                  example: "John Doe"
+                bio:
+                  type: string
+                  description: Short biography
+                  example: "Software engineer at Acme Corp"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "profile_update_failed" }
+
+  /v1/history:
+    get:
+      tags: [History]
+      summary: Get message history
+      description: |
+        Fetches message history for a group or private conversation. Returns messages
+        with ID greater than `since_id`, ordered by ID ascending, up to `limit` messages.
+        Use `group_id` for group history or `user_id` for private conversation history.
+        Exactly one must be provided. For group history, the user must be a member.
+      operationId: getHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: group_id
+          in: query
+          required: false
+          description: Group ID to fetch history for (mutually exclusive with user_id)
+          schema:
+            type: string
+          example: "nexus_dev_team"
+        - name: user_id
+          in: query
+          required: false
+          description: User ID to fetch private conversation history with (mutually exclusive with group_id)
+          schema:
+            type: string
+          example: "420158066212864"
+        - name: since_id
+          in: query
+          required: false
+          description: Return only messages with ID greater than this value (cursor-based pagination)
+          schema:
+            type: integer
+            format: uint64
+            default: 0
+          example: 420158066278400
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of messages to return (1-100, default 25)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+          example: 25
+      responses:
+        "200":
+          description: Message history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      messages:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Message"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                group_id_or_user_id_required:
+                  value: { "success": false, "message": "group_id_or_user_id_required" }
+                invalid_limit:
+                  value: { "success": false, "message": "invalid_limit" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not a member of the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_group_member" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "history_failed" }
