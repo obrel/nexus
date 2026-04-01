@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -11,13 +12,22 @@ import (
 
 // New creates and validates a Redis client from configuration.
 func New(cfg *config.RedisConfig) (*redis.Client, error) {
-	rdb := redis.NewClient(&redis.Options{
+	opts := &redis.Options{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Password:     cfg.Password,
 		DialTimeout:  5 * time.Second,
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 3 * time.Second,
-	})
+	}
+
+	// Configure TLS if enabled
+	if cfg.TLS {
+		opts.TLSConfig = &tls.Config{
+			InsecureSkipVerify: cfg.Insecure,
+		}
+	}
+
+	rdb := redis.NewClient(opts)
 
 	rdb.AddHook(&MetricsHook{})
 

@@ -55,6 +55,7 @@ type MySQLConfig struct {
 	MaxOpenConns    int    `mapstructure:"max_open_conns"`
 	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
 	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"` // seconds
+	TLSMode         string `mapstructure:"tls_mode"`          // "disable", "prefer", "require", "skip-verify" (development only)
 }
 
 // RedisConfig contains connection parameters for Redis.
@@ -62,6 +63,8 @@ type RedisConfig struct {
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
 	Password string `mapstructure:"password"`
+	TLS      bool   `mapstructure:"tls"`      // Enable TLS for Redis connection
+	Insecure bool   `mapstructure:"insecure"` // Skip certificate verification (development only)
 }
 
 // NATSConfig contains NATS broker connection settings.
@@ -111,7 +114,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("http.port", 8080)
 	viper.SetDefault("http.jwt_secret", "dev-secret-key-change-in-production")
 	viper.SetDefault("http.internal_api_key", "dev-internal-key-change-in-production")
-	viper.SetDefault("http.max_body_size", 1<<20) // 1MB
+	viper.SetDefault("http.max_body_size", 1<<20)    // 1MB
 	viper.SetDefault("http.max_header_bytes", 1<<20) // 1MB
 	viper.SetDefault("ws.port", 8081)
 	viper.SetDefault("ws.ping_period", 30)
@@ -128,6 +131,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("worker.batch_size", 50)
 	viper.SetDefault("worker.poll_interval", 1000) // 1s
 	viper.SetDefault("mcp.port", 8082)
+	viper.SetDefault("mysql.tls_mode", "disable")
+	viper.SetDefault("redis.tls", false)
+	viper.SetDefault("redis.insecure", false)
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {

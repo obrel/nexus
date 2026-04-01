@@ -16,12 +16,13 @@ func New(cfg *config.MySQLConfig) (*sql.DB, error) {
 	log := logger.For("infra", "mysql")
 
 	// Build DSN (Data Source Name)
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC&tls=%s",
 		cfg.User,
 		cfg.Password,
 		cfg.Host,
 		cfg.Port,
 		cfg.DBName,
+		cfg.TLSMode,
 	)
 
 	db, err := sql.Open("mysql", dsn)
