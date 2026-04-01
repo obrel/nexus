@@ -269,8 +269,56 @@
       font-size: 0.65rem;
       opacity: 0.6;
       margin-top: 0.25rem;
-      display: block;
-      text-align: right;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .msg .status-icon {
+      font-size: 0.8rem;
+    }
+
+    .msg-actions {
+      display: none;
+      position: absolute;
+      top: 0;
+      right: 100%;
+      padding-right: 0.5rem;
+      gap: 0.5rem;
+    }
+
+    .msg.sent:hover .msg-actions {
+      display: flex;
+    }
+
+    .msg-actions button {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .msg-actions button:hover {
+      background: #f0f0f0;
+      color: var(--accent);
+    }
+
+    .system-msg {
+      align-self: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: #eee;
+      padding: 0.2rem 0.6rem;
+      border-radius: 1rem;
+      margin: 0.5rem 0;
     }
 
     .chat-input-area {
@@ -494,7 +542,13 @@
       const name = persona.charAt(0).toUpperCase() + persona.slice(1);
 
       // Build JWT (using simplified HS256 shim for demo)
-      const token = await signJWT({ sub: userId, tid: CONFIG.appId, exp: Math.floor(Date.now() / 1000) + 86400 }, CONFIG.jwtSecret);
+      const now = Math.floor(Date.now() / 1000);
+      const token = await signJWT({
+        sub: userId,
+        tid: CONFIG.appId,
+        iat: now,
+        exp: now + 86400
+      }, CONFIG.jwtSecret);
 
       state.user = { id: userId, name: name, token: token };
 
@@ -542,31 +596,91 @@
     function handleEvent(event) {
       console.log('Received:', event);
       if (event.event === 'MSG_NEW') {
-        const msg = event.data;
-        const tabId = msg.recipient_type === 'group' ? msg.recipient_id : (msg.sender_id === state.user.id ? msg.recipient_id : msg.sender_id);
-        const type = msg.recipient_type;
-
-        // Add tab if not exists
-        if (!findTab(type, tabId)) {
-          addTab(type, tabId, tabId, false);
-        }
-
-        if (state.activeTab && state.activeTab.id === tabId && state.activeTab.type === type) {
-          // If this is our own message, check if we already appended it locally
-          const alreadyExists = document.getElementById(`msg-${msg.message_id}`);
-          if (!alreadyExists) {
-            appendMessage(msg, msg.sender_id === state.user.id);
-          }
-        }
+        handleNewMessage(event.data);
+      } else if (event.event === 'MSG_UPDATED') {
+        handleUpdatedMessage(event.data);
+      } else if (event.event === 'MSG_STATUS') {
+        handleStatusMessage(event.data);
+      } else if (event.event === 'USR_JOINED') {
+        handleUserJoined(event.data);
       } else if (event.event === 'TYP_INDICATOR') {
         const data = event.data;
         if (state.activeTab && data.typing && data.user_id !== state.user.id) {
-          if ((state.activeTab.type === 'group' && data.recipient_id === state.activeTab.id) ||
-            (state.activeTab.type === 'user' && data.user_id === state.activeTab.id)) {
-            document.getElementById('typing-indicator').innerText = `${data.user_id} is typing...`;
-            setTimeout(() => document.getElementById('typing-indicator').innerText = '', 3000);
+          const isTarget = data.recipient_type === 'group'
+            ? (data.recipient_id === state.activeTab.id && state.activeTab.type === 'group')
+            : (data.user_id === state.activeTab.id && state.activeTab.type === 'user');
+
+          if (isTarget) {
+            const indicatorEl = document.getElementById('typing-indicator');
+            indicatorEl.innerText = `${data.user_id} is typing...`;
+            clearTimeout(state.indicatorTimeout);
+            state.indicatorTimeout = setTimeout(() => indicatorEl.innerText = '', 3000);
           }
         }
+      }
+    }
+
+    function handleNewMessage(msg) {
+      const tabId = msg.recipient_type === 'group' ? msg.recipient_id : (msg.sender_id === state.user.id ? msg.recipient_id : msg.sender_id);
+      const type = msg.recipient_type;
+
+      if (!findTab(type, tabId)) {
+        addTab(type, tabId, tabId, false);
+      }
+
+      if (state.activeTab && state.activeTab.id === tabId && state.activeTab.type === type) {
+        const alreadyExists = document.getElementById(`msg-${msg.message_id}`);
+        if (!alreadyExists) {
+          appendMessage(msg, msg.sender_id === state.user.id);
+        }
+        // Ack if it's received and not from us
+        if (msg.sender_id !== state.user.id) {
+          ackMessage(msg.message_id, 'read');
+        }
+      }
+    }
+
+    function handleUpdatedMessage(data) {
+      const { message_id, action, content } = data;
+      const el = document.getElementById(`msg-${message_id}`);
+      if (!el) return;
+
+      if (action === 'deleted') {
+        el.querySelector('.msg-content').innerHTML = `<i>Message deleted</i>`;
+        el.querySelector('.msg-content').style.opacity = '0.5';
+        el.querySelector('.msg-actions')?.remove();
+      } else if (action === 'edited') {
+        const text = content.text || content.content;
+        el.querySelector('.msg-content').innerText = text;
+        const timeEl = el.querySelector('.time');
+        if (!timeEl.innerText.includes('(edited)')) {
+          timeEl.innerHTML = `(edited) ${timeEl.innerHTML}`;
+        }
+      }
+    }
+
+    function handleStatusMessage(data) {
+      const { message_id, status } = data;
+      const el = document.getElementById(`msg-${message_id}`);
+      if (!el) return;
+
+      const statusEl = el.querySelector('.status-icon');
+      if (statusEl) {
+        statusEl.innerText = status === 'read' ? '✓✓' : '✓';
+        statusEl.title = status.charAt(0).toUpperCase() + status.slice(1);
+        if (status === 'read') statusEl.style.color = '#fff';
+      }
+    }
+
+    function handleUserJoined(data) {
+      const { group_id, user_id } = data;
+      if (state.activeTab && state.activeTab.type === 'group' && state.activeTab.id === group_id) {
+        const container = document.getElementById('messages-container');
+        const el = document.createElement('div');
+        el.className = 'system-msg';
+        el.innerText = `${user_id} joined the group`;
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
       }
     }
 
@@ -644,7 +758,10 @@
         const data = await res.json();
         const messages = data.data?.messages;
         if (Array.isArray(messages)) {
-          messages.forEach(m => appendMessage(m, m.sender_id === state.user.id));
+          messages.forEach(m => {
+            appendMessage(m, m.sender_id === state.user.id);
+            if (m.sender_id !== state.user.id) ackMessage(m.message_id, 'read');
+          });
         }
       } else {
         console.error(`Failed to fetch history for ${id}: ${res.status}`);
@@ -710,11 +827,67 @@
 
       el.innerHTML = `
                 ${!isSent ? `<span class="sender">${msg.sender_id}</span>` : ''}
-                <div>${text}</div>
-                <span class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                ${isSent ? `
+                <div class="msg-actions">
+                  <button onclick="startEdit('${msgId}')" title="Edit">✎</button>
+                  <button onclick="startDelete('${msgId}')" title="Delete">✕</button>
+                </div>
+                ` : ''}
+                <div class="msg-content">${text}</div>
+                <div class="time">
+                  ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  ${isSent ? `<span class="status-icon" title="Sent">✓</span>` : ''}
+                </div>
             `;
       container.appendChild(el);
       container.scrollTop = container.scrollHeight;
+    }
+
+    async function startEdit(messageId) {
+      const el = document.getElementById(`msg-${messageId}`);
+      const oldText = el.querySelector('.msg-content').innerText;
+      const newText = prompt('Edit message:', oldText);
+      if (!newText || newText === oldText) return;
+
+      const res = await fetch(`${CONFIG.http}/v1/messages/edit`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: messageId, content: { type: 'text', text: newText } })
+      });
+
+      if (res.ok) {
+        handleUpdatedMessage({ message_id: messageId, action: 'edited', content: { text: newText } });
+      } else {
+        alert('Failed to edit message');
+      }
+    }
+
+    async function startDelete(messageId) {
+      if (!confirm('Delete this message?')) return;
+
+      const res = await fetch(`${CONFIG.http}/v1/messages/delete`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: messageId })
+      });
+
+      if (res.ok) {
+        handleUpdatedMessage({ message_id: messageId, action: 'deleted' });
+      } else {
+        alert('Failed to delete message');
+      }
+    }
+
+    async function ackMessage(messageId, status = 'read') {
+      try {
+        await fetch(`${CONFIG.http}/v1/messages/ack`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.user.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message_id: messageId, status: status })
+        });
+      } catch (e) {
+        console.warn('Failed to ack message', messageId, e);
+      }
     }
 
     async function send() {
