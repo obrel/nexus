@@ -1,0 +1,29 @@
+name: Releaser
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on tags like v1.0.0, v2.1, etc.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # You can use a matrix strategy for cross-platform builds
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build project
+        run: make release
+
+      - name: Create and upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            nexus-${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
