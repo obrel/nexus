@@ -122,7 +122,7 @@ curl -X POST http://localhost:8080/v1/messages/send \
 
 ### Docker Compose
 
-If you prefer containers (MySQL, Redis, and NATS must be accessible on localhost):
+If you prefer containers (includes all dependencies: MySQL, Redis, NATS, and automatic migrations):
 
 ```bash
 docker compose up --build
