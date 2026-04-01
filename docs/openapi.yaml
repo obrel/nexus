@@ -324,6 +324,342 @@ paths:
               example:
                 { "success": false, "message": "register_failed" }
 
+  /internal/v1/messages/send:
+    post:
+      tags: [Auth]
+      summary: Send a message (internal)
+      description: |
+        Service-to-service endpoint for sending a message on behalf of a user.
+        Intended for external services that receive a message from a client and
+        need to deliver it through Nexus without holding a JWT token themselves.
+        Authenticated via `X-Internal-Key` header. The `sender_id` field must
+        be a valid Nexus user ID. Group membership rules apply as normal —
+        the sender must be a member of the target group for group messages.
+        `group_id` and `user_id` are mutually exclusive — exactly one must be provided.
+      operationId: internalSendMessage
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+          description: Internal API key configured via `http.internal_api_key`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, sender_id, content]
+              properties:
+                app_id:
+                  type: string
+                  description: Tenant/app ID
+                  example: "myapp"
+                sender_id:
+                  type: string
+                  description: Nexus user ID of the message sender
+                  example: "420158066212864"
+                group_id:
+                  type: string
+                  description: Target group ID (mutually exclusive with user_id)
+                  example: "nexus_dev_team"
+                user_id:
+                  type: string
+                  description: Target user ID for private message (mutually exclusive with group_id)
+                  example: "420158066278401"
+                content:
+                  type: object
+                  description: Structured message content (JSON object)
+                  example: { "type": "text", "text": "Hello from external service!" }
+      responses:
+        "202":
+          description: Message accepted for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message_id:
+                        type: string
+                        description: Snowflake message ID
+                        example: "420158066278400"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                app_id_required:
+                  value: { "success": false, "message": "app_id_required" }
+                sender_id_required:
+                  value: { "success": false, "message": "sender_id_required" }
+                group_id_or_user_id_required:
+                  value: { "success": false, "message": "group_id_or_user_id_required" }
+                mutually_exclusive:
+                  value: { "success": false, "message": "group_id_and_user_id_are_mutually_exclusive" }
+                content_required:
+                  value: { "success": false, "message": "content_required" }
+                cannot_message_self:
+                  value: { "success": false, "message": "cannot_message_self" }
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "invalid_internal_key" }
+        "403":
+          description: Sender is not a member of the target group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_member" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "send_failed" }
+
+  /internal/v1/messages/edit:
+    post:
+      tags: [Auth]
+      summary: Edit a message (internal)
+      description: |
+        Service-to-service endpoint for editing a message on behalf of its sender.
+        Only the original sender (`sender_id`) may edit the message.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalEditMessage
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+          description: Internal API key configured via `http.internal_api_key`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, sender_id, message_id, content]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                sender_id:
+                  type: string
+                  description: Nexus user ID of the original message sender
+                  example: "420158066212864"
+                message_id:
+                  type: string
+                  description: Snowflake ID of the message to edit
+                  example: "420158066278400"
+                content:
+                  type: object
+                  description: Updated message content (JSON object)
+                  example: { "type": "text", "text": "Updated content" }
+      responses:
+        "200":
+          description: Message edited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message_id:
+                        type: string
+                        example: "420158066278400"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "edit_failed" }
+
+  /internal/v1/messages/delete:
+    post:
+      tags: [Auth]
+      summary: Delete a message (internal)
+      description: |
+        Service-to-service endpoint for soft-deleting a message on behalf of its sender.
+        Only the original sender (`sender_id`) may delete the message.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalDeleteMessage
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+          description: Internal API key configured via `http.internal_api_key`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, sender_id, message_id]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                sender_id:
+                  type: string
+                  description: Nexus user ID of the original message sender
+                  example: "420158066212864"
+                message_id:
+                  type: string
+                  description: Snowflake ID of the message to delete
+                  example: "420158066278400"
+      responses:
+        "200":
+          description: Message deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message_id:
+                        type: string
+                        example: "420158066278400"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "delete_failed" }
+
+  /internal/v1/messages/ack:
+    post:
+      tags: [Auth]
+      summary: Acknowledge a message (internal)
+      description: |
+        Service-to-service endpoint for recording a message delivery status on behalf of a user.
+        Valid statuses are `received` and `read`.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalAckMessage
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+          description: Internal API key configured via `http.internal_api_key`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, user_id, message_id, status]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                user_id:
+                  type: string
+                  description: Nexus user ID of the acknowledging user
+                  example: "420158066278401"
+                message_id:
+                  type: string
+                  description: Snowflake ID of the message to acknowledge
+                  example: "420158066278400"
+                status:
+                  type: string
+                  enum: [received, read]
+                  example: "read"
+      responses:
+        "200":
+          description: Acknowledgement recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_status:
+                  value: { "success": false, "message": "invalid_status" }
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "ack_failed" }
+
   /v1/messages/send:
     post:
       tags: [Messages]

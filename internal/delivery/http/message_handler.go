@@ -97,6 +97,256 @@ func NewMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 	}
 }
 
+// NewInternalMessageSendHandler creates an HTTP handler for POST /internal/v1/messages/send.
+// It is intended for service-to-service use; the caller supplies app_id and sender_id explicitly
+// instead of relying on JWT claims.
+func NewInternalMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
+	log := logger.For("delivery", "http")
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		var req struct {
+			AppID    string          `json:"app_id"`
+			SenderID string          `json:"sender_id"`
+			GroupID  string          `json:"group_id"`
+			UserID   string          `json:"user_id"`
+			Content  json.RawMessage `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+		if req.AppID == "" {
+			respondError(w, http.StatusBadRequest, "app_id_required")
+			return
+		}
+		if req.SenderID == "" {
+			respondError(w, http.StatusBadRequest, "sender_id_required")
+			return
+		}
+
+		var rt domain.RecipientType
+		var recipientID string
+		switch {
+		case req.GroupID != "" && req.UserID != "":
+			respondError(w, http.StatusBadRequest, "group_id_and_user_id_are_mutually_exclusive")
+			return
+		case req.GroupID != "":
+			rt = domain.RecipientGroup
+			recipientID = req.GroupID
+		case req.UserID != "":
+			rt = domain.RecipientUser
+			recipientID = req.UserID
+		default:
+			respondError(w, http.StatusBadRequest, "group_id_or_user_id_required")
+			return
+		}
+		if !isValidID(recipientID) {
+			respondError(w, http.StatusBadRequest, "invalid_recipient_id")
+			return
+		}
+		if rt == domain.RecipientUser && recipientID == req.SenderID {
+			respondError(w, http.StatusBadRequest, "cannot_message_self")
+			return
+		}
+		if len(req.Content) == 0 {
+			respondError(w, http.StatusBadRequest, "content_required")
+			return
+		}
+		if !json.Valid(req.Content) {
+			respondError(w, http.StatusBadRequest, "invalid_content_json")
+			return
+		}
+
+		msg := &domain.Message{
+			AppID:         req.AppID,
+			RecipientType: rt,
+			RecipientID:   recipientID,
+			Content:       req.Content,
+			SenderType:    domain.SenderUser,
+			SenderID:      req.SenderID,
+		}
+
+		if err := uc.Send(ctx, req.AppID, msg); err != nil {
+			log.Errorf("Failed to send internal message: %v", err)
+			if errors.Is(err, domain.ErrAccessDenied) {
+				respondError(w, http.StatusForbidden, "not_a_member")
+				return
+			}
+			respondError(w, http.StatusInternalServerError, "send_failed")
+			return
+		}
+
+		resp := map[string]any{
+			"success": true,
+			"data": map[string]string{
+				"message_id": fmt.Sprintf("%d", msg.ID),
+			},
+		}
+		respondSuccess(w, http.StatusAccepted, resp)
+	}
+}
+
+// NewInternalMessageEditHandler creates an HTTP handler for POST /internal/v1/messages/edit.
+func NewInternalMessageEditHandler(uc usecase.MessageUseCase) http.HandlerFunc {
+	log := logger.For("delivery", "http")
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		var req struct {
+			AppID     string          `json:"app_id"`
+			SenderID  string          `json:"sender_id"`
+			MessageID string          `json:"message_id"`
+			Content   json.RawMessage `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+		if req.AppID == "" {
+			respondError(w, http.StatusBadRequest, "app_id_required")
+			return
+		}
+		if req.SenderID == "" {
+			respondError(w, http.StatusBadRequest, "sender_id_required")
+			return
+		}
+		if req.MessageID == "" {
+			respondError(w, http.StatusBadRequest, "message_id_required")
+			return
+		}
+		if len(req.Content) == 0 {
+			respondError(w, http.StatusBadRequest, "content_required")
+			return
+		}
+
+		msgID, err := strconv.ParseUint(req.MessageID, 10, 64)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_message_id")
+			return
+		}
+		if !json.Valid(req.Content) {
+			respondError(w, http.StatusBadRequest, "invalid_content_json")
+			return
+		}
+
+		if err := uc.Edit(ctx, req.AppID, req.SenderID, msgID, string(req.Content)); err != nil {
+			log.Errorf("Failed to edit message (internal): %v", err)
+			respondError(w, http.StatusInternalServerError, "edit_failed")
+			return
+		}
+
+		resp := map[string]any{
+			"success": true,
+			"data":    map[string]string{"message_id": req.MessageID},
+		}
+		respondSuccess(w, http.StatusOK, resp)
+	}
+}
+
+// NewInternalMessageDeleteHandler creates an HTTP handler for POST /internal/v1/messages/delete.
+func NewInternalMessageDeleteHandler(uc usecase.MessageUseCase) http.HandlerFunc {
+	log := logger.For("delivery", "http")
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		var req struct {
+			AppID     string `json:"app_id"`
+			SenderID  string `json:"sender_id"`
+			MessageID string `json:"message_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+		if req.AppID == "" {
+			respondError(w, http.StatusBadRequest, "app_id_required")
+			return
+		}
+		if req.SenderID == "" {
+			respondError(w, http.StatusBadRequest, "sender_id_required")
+			return
+		}
+		if req.MessageID == "" {
+			respondError(w, http.StatusBadRequest, "message_id_required")
+			return
+		}
+
+		msgID, err := strconv.ParseUint(req.MessageID, 10, 64)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_message_id")
+			return
+		}
+
+		if err := uc.Delete(ctx, req.AppID, req.SenderID, msgID); err != nil {
+			log.Errorf("Failed to delete message (internal): %v", err)
+			respondError(w, http.StatusInternalServerError, "delete_failed")
+			return
+		}
+
+		resp := map[string]any{
+			"success": true,
+			"data":    map[string]string{"message_id": req.MessageID},
+		}
+		respondSuccess(w, http.StatusOK, resp)
+	}
+}
+
+// NewInternalMessageAckHandler creates an HTTP handler for POST /internal/v1/messages/ack.
+func NewInternalMessageAckHandler(uc usecase.MessageUseCase) http.HandlerFunc {
+	log := logger.For("delivery", "http")
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		var req struct {
+			AppID     string `json:"app_id"`
+			UserID    string `json:"user_id"`
+			MessageID string `json:"message_id"`
+			Status    string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+		if req.AppID == "" {
+			respondError(w, http.StatusBadRequest, "app_id_required")
+			return
+		}
+		if req.UserID == "" {
+			respondError(w, http.StatusBadRequest, "user_id_required")
+			return
+		}
+		if req.MessageID == "" {
+			respondError(w, http.StatusBadRequest, "message_id_required")
+			return
+		}
+		if req.Status == "" {
+			respondError(w, http.StatusBadRequest, "status_required")
+			return
+		}
+
+		msgID, err := strconv.ParseUint(req.MessageID, 10, 64)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_message_id")
+			return
+		}
+
+		status := domain.MessageStatus(req.Status)
+		if status != domain.StatusReceived && status != domain.StatusRead {
+			respondError(w, http.StatusBadRequest, "invalid_status")
+			return
+		}
+
+		if err := uc.Ack(ctx, req.AppID, req.UserID, msgID, status); err != nil {
+			log.Errorf("Failed to ack message (internal): %v", err)
+			respondError(w, http.StatusInternalServerError, "ack_failed")
+			return
+		}
+
+		respondSuccess(w, http.StatusOK, map[string]any{"success": true, "data": map[string]any{}})
+	}
+}
+
 // NewMessageEditHandler creates an HTTP handler for POST /v1/messages/edit.
 func NewMessageEditHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")

@@ -83,6 +83,10 @@ func (s *Server) RegisterRoutes(
 		s.r.Group(func(r chi.Router) {
 			r.Use(InternalAPIKeyMiddleware(s.internalAPIKey))
 			r.Post("/internal/v1/auth/register", NewInternalRegisterHandler(authUC, defaultAppID))
+			r.Post("/internal/v1/messages/send", NewInternalMessageSendHandler(msgUC))
+			r.Post("/internal/v1/messages/edit", NewInternalMessageEditHandler(msgUC))
+			r.Post("/internal/v1/messages/delete", NewInternalMessageDeleteHandler(msgUC))
+			r.Post("/internal/v1/messages/ack", NewInternalMessageAckHandler(msgUC))
 		})
 	}
 

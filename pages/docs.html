@@ -668,7 +668,7 @@ cd nexus</code></pre>
                 <p>Nexus uses JWT (HS256) for authenticating all API requests and WebSocket connections. Tokens
                     are passed via the <code>Authorization: Bearer &lt;token&gt;</code> header.</p>
                 <p>Nexus does not provide user registration or login flows. Developers implement their own
-                    auth service and use the <a href="#auth-register">internal registration API</a> to sync
+                    auth service and use the <a href="#internal-auth">internal authentication API</a> to sync
                     users into Nexus.</p>
 
                 <h3>JWT Format</h3>
@@ -756,12 +756,16 @@ def generate_nexus_jwt(jwt_secret: str, app_id: str, user_id: str) -> str:
                         in the Nexus server (<code>http.jwt_secret</code>). In production, use a strong secret
                         of at least 32 characters.</p>
                 </div>
+            </section>
 
-                <h3 id="auth-register">Internal Registration (Service-to-Service)</h3>
+            <section id="internal-auth">
+                <h2>Internal Authentication (Service-to-Service)</h2>
                 <p>Developers implement their own auth service and use this internal API to sync users
                     into the Nexus <code>users</code> table. The endpoint creates the user if they don't
                     exist and returns a JWT.</p>
                 <p>Authenticated via <code>X-Internal-Key</code> header instead of JWT.</p>
+
+                <h3>Registration (Internal)</h3>
                 <pre><code>POST /internal/v1/auth/register
 X-Internal-Key: your-internal-api-key
 
@@ -790,7 +794,8 @@ X-Internal-Key: your-internal-api-key
             <section id="messages">
                 <h2>Messages API</h2>
                 <p>All message operations are performed via the Ingress HTTP API. The same endpoint handles both group
-                    and private messages.</p>
+                    and private messages. For messages originating from an external service, see the
+                    <a href="#internal-messages">internal send API</a>.</p>
 
                 <h3>Send Group Message</h3>
                 <p>The sender must be a member of the target group. Non-members receive
@@ -858,6 +863,96 @@ X-Internal-Key: your-internal-api-key
   "success": true,
   "data": {}
 }</code></pre>
+            </section>
+
+            <section id="internal-messages">
+                <h2>Internal Messages API (Service-to-Service)</h2>
+                <p>For use cases where message operations originate from an external service — not directly from the
+                    client — Nexus exposes internal counterparts for the full message lifecycle. This avoids requiring
+                    the external service to hold or forward a user's JWT token.</p>
+                <p>All internal message endpoints are authenticated via <code>X-Internal-Key</code> header and require
+                    <code>app_id</code> plus the acting user's ID to be provided in the request body. Group membership
+                    rules apply as normal.</p>
+
+                <h3>Send Message</h3>
+                <p>Send a group or private message on behalf of a user. <code>group_id</code> and
+                    <code>user_id</code> are mutually exclusive.</p>
+                <pre><code>POST /internal/v1/messages/send
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "sender_id": "420158066212864",
+  "group_id": "nexus_dev",
+  "content": { "type": "text", "text": "Hello from external service!" }
+}
+
+// Response (202 Accepted)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h3>Edit Message</h3>
+                <p>Edit the content of a message. Only the original sender (<code>sender_id</code>) can edit.</p>
+                <pre><code>POST /internal/v1/messages/edit
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "sender_id": "420158066212864",
+  "message_id": "420158066278400",
+  "content": { "type": "text", "text": "Updated content" }
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h3>Delete Message</h3>
+                <p>Soft-delete a message. Only the original sender (<code>sender_id</code>) can delete.</p>
+                <pre><code>POST /internal/v1/messages/delete
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "sender_id": "420158066212864",
+  "message_id": "420158066278400"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h3>Acknowledge Message</h3>
+                <p>Record a delivery status on behalf of a user. Valid statuses: <code>received</code>,
+                    <code>read</code>.</p>
+                <pre><code>POST /internal/v1/messages/ack
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "user_id": "420158066278401",
+  "message_id": "420158066278400",
+  "status": "read"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": {}
+}</code></pre>
+
+                <div class="callout">
+                    <p><strong>Note:</strong> <code>app_id</code> and the acting user ID (<code>sender_id</code> or
+                        <code>user_id</code>) are required on all internal message endpoints. User IDs must be valid
+                        Nexus user IDs returned by
+                        <a href="#auth-register"><code>/internal/v1/auth/register</code></a>.</p>
+                </div>
             </section>
 
             <section id="groups">
