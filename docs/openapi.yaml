@@ -937,6 +937,414 @@ paths:
               example:
                 { "success": false, "message": "ack_failed" }
 
+  /internal/v1/groups/create:
+    post:
+      tags: [Auth]
+      summary: Create a group (internal)
+      description: |
+        Service-to-service endpoint for creating a group on behalf of a user.
+        The `user_id` is recorded as the group creator and is automatically added as a member.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalCreateGroup
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, user_id, group_id, name]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                user_id:
+                  type: string
+                  description: Nexus user ID of the group creator
+                  example: "420158066212864"
+                group_id:
+                  type: string
+                  example: "nexus_dev_team"
+                name:
+                  type: string
+                  example: "Nexus Dev Team"
+                description:
+                  type: string
+                  example: "Main development channel"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Group already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_already_exists" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "create_failed" }
+
+  /internal/v1/groups/detail:
+    get:
+      tags: [Auth]
+      summary: Get group detail (internal)
+      description: |
+        Service-to-service endpoint for retrieving group details on behalf of a user.
+        The `user_id` must be a member of the group.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalGetGroupDetail
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: app_id
+          required: true
+          schema:
+            type: string
+          example: "myapp"
+        - in: query
+          name: user_id
+          required: true
+          schema:
+            type: string
+          example: "420158066212864"
+        - in: query
+          name: group_id
+          required: true
+          schema:
+            type: string
+          example: "nexus_dev_team"
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/GroupDetail"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not a member of the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_member" }
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_not_found" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "get_failed" }
+
+  /internal/v1/groups/update:
+    post:
+      tags: [Auth]
+      summary: Update a group (internal)
+      description: |
+        Service-to-service endpoint for updating a group's name and/or description on behalf of a user.
+        The `user_id` must be a member of the group.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalUpdateGroup
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, user_id, group_id]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                user_id:
+                  type: string
+                  example: "420158066212864"
+                group_id:
+                  type: string
+                  example: "nexus_dev_team"
+                name:
+                  type: string
+                  example: "Nexus Core Team"
+                description:
+                  type: string
+                  example: "Core engineering channel"
+      responses:
+        "200":
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not a member of the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "not_a_member" }
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_not_found" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "update_failed" }
+
+  /internal/v1/groups/join:
+    post:
+      tags: [Auth]
+      summary: Join a group (internal)
+      description: |
+        Service-to-service endpoint for adding a user to a group.
+        Broadcasts a `USR_JOINED` event to existing members and triggers a WebSocket subscription.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalJoinGroup
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, user_id, group_id]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                user_id:
+                  type: string
+                  example: "420158066212864"
+                group_id:
+                  type: string
+                  example: "nexus_dev_team"
+      responses:
+        "200":
+          description: Joined group
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "group_not_found" }
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "join_failed" }
+
+  /internal/v1/groups/leave:
+    post:
+      tags: [Auth]
+      summary: Leave a group (internal)
+      description: |
+        Service-to-service endpoint for removing a user from a group.
+        Broadcasts a `USR_LEFT` event to remaining members and triggers WebSocket unsubscription.
+        Authenticated via `X-Internal-Key` header.
+      operationId: internalLeaveGroup
+      parameters:
+        - in: header
+          name: X-Internal-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, user_id, group_id]
+              properties:
+                app_id:
+                  type: string
+                  example: "myapp"
+                user_id:
+                  type: string
+                  example: "420158066212864"
+                group_id:
+                  type: string
+                  example: "nexus_dev_team"
+      responses:
+        "200":
+          description: Left group
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      group_id:
+                        type: string
+                        example: "nexus_dev_team"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or missing internal API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                { "success": false, "message": "leave_failed" }
+
   /v1/groups/create:
     post:
       tags: [Groups]

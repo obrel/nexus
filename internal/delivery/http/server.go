@@ -87,6 +87,11 @@ func (s *Server) RegisterRoutes(
 			r.Post("/internal/v1/messages/edit", NewInternalMessageEditHandler(msgUC))
 			r.Post("/internal/v1/messages/delete", NewInternalMessageDeleteHandler(msgUC))
 			r.Post("/internal/v1/messages/ack", NewInternalMessageAckHandler(msgUC))
+			r.Post("/internal/v1/groups/create", NewInternalGroupCreateHandler(grpUC))
+			r.Get("/internal/v1/groups/detail", NewInternalGroupGetHandler(grpUC))
+			r.Post("/internal/v1/groups/update", NewInternalGroupUpdateHandler(grpUC))
+			r.Post("/internal/v1/groups/join", NewInternalGroupJoinHandler(grpUC))
+			r.Post("/internal/v1/groups/leave", NewInternalGroupLeaveHandler(grpUC))
 		})
 	}
 
