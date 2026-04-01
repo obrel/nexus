@@ -59,7 +59,7 @@ All three tiers scale independently. Ingress is stateless. Egress is stateful bu
 
 ## Documentation
 
-Full API reference, authentication guide, JWT code snippets, and configuration details are available in the **[Documentation](pages/docs.html)**.
+Full API reference, authentication guide, JWT code snippets, and configuration details are available in the **[Documentation](https://nexus.docs.web.id/docs.html)**.
 
 When the server is running, Swagger UI is available at `http://localhost:8080/docs` and the raw OpenAPI spec at `http://localhost:8080/docs/openapi.yaml`.
 
@@ -153,7 +153,7 @@ Nexus uses **JWT** for authentication but does **not** provide login or registra
 
 JWT claims: `sub` (user ID), `tid` (app/tenant ID), `iat`, `exp` (24h).
 
-See the [documentation](pages/docs.html) for code snippets on generating JWTs in Go, Node.js, and Python.
+See the [documentation](https://nexus.docs.web.id/docs.html) for code snippets on generating JWTs in Go, Node.js, and Python.
 
 ## Database
 
