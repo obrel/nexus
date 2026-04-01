@@ -36,6 +36,23 @@ tags:
     description: Message history sync
 
 components:
+  parameters:
+    XInternalKey:
+      in: header
+      name: X-Internal-Key
+      required: true
+      schema:
+        type: string
+      description: Internal API key configured via `http.internal_api_key`
+    XAppID:
+      in: header
+      name: X-App-ID
+      required: true
+      schema:
+        type: string
+      description: Tenant/app ID
+      example: "myapp"
+
   securitySchemes:
     BearerAuth:
       type: http
@@ -252,12 +269,8 @@ paths:
         > and `http.internal_api_key` are set in the server configuration.
       operationId: registerUser
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
-          description: Internal API key configured via `http.internal_api_key`
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
@@ -274,10 +287,6 @@ paths:
                   type: string
                   description: Display name (optional, set on newly created users)
                   example: "John Doe"
-                app_id:
-                  type: string
-                  description: Tenant ID (defaults to server's configured app ID if omitted)
-                  example: "myapp"
       responses:
         "200":
           description: User registered or retrieved successfully
@@ -341,24 +350,16 @@ paths:
         `group_id` and `user_id` are mutually exclusive — exactly one must be provided.
       operationId: internalSendMessage
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
-          description: Internal API key configured via `http.internal_api_key`
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, sender_id, content]
+              required: [sender_id, content]
               properties:
-                app_id:
-                  type: string
-                  description: Tenant/app ID
-                  example: "myapp"
                 sender_id:
                   type: string
                   description: Nexus user ID of the message sender
@@ -400,8 +401,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               examples:
-                app_id_required:
-                  value: { "success": false, "message": "app_id_required" }
                 sender_id_required:
                   value: { "success": false, "message": "sender_id_required" }
                 group_id_or_user_id_required:
@@ -447,23 +446,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalEditMessage
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
-          description: Internal API key configured via `http.internal_api_key`
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, sender_id, message_id, content]
+              required: [sender_id, message_id, content]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 sender_id:
                   type: string
                   description: Nexus user ID of the original message sender
@@ -524,23 +516,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalDeleteMessage
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
-          description: Internal API key configured via `http.internal_api_key`
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, sender_id, message_id]
+              required: [sender_id, message_id]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 sender_id:
                   type: string
                   description: Nexus user ID of the original message sender
@@ -597,23 +582,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalAckMessage
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
-          description: Internal API key configured via `http.internal_api_key`
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, user_id, message_id, status]
+              required: [user_id, message_id, status]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 user_id:
                   type: string
                   description: Nexus user ID of the acknowledging user
@@ -950,22 +928,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalCreateGroup
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, user_id, group_id, name]
+              required: [user_id, group_id, name]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 user_id:
                   type: string
                   description: Nexus user ID of the group creator
@@ -1035,17 +1007,8 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalGetGroupDetail
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: app_id
-          required: true
-          schema:
-            type: string
-          example: "myapp"
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
         - in: query
           name: user_id
           required: true
@@ -1118,22 +1081,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalUpdateGroup
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, user_id, group_id]
+              required: [user_id, group_id]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 user_id:
                   type: string
                   example: "420158066212864"
@@ -1210,22 +1167,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalJoinGroup
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, user_id, group_id]
+              required: [user_id, group_id]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 user_id:
                   type: string
                   example: "420158066212864"
@@ -1288,22 +1239,16 @@ paths:
         Authenticated via `X-Internal-Key` header.
       operationId: internalLeaveGroup
       parameters:
-        - in: header
-          name: X-Internal-Key
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XInternalKey"
+        - $ref: "#/components/parameters/XAppID"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [app_id, user_id, group_id]
+              required: [user_id, group_id]
               properties:
-                app_id:
-                  type: string
-                  example: "myapp"
                 user_id:
                   type: string
                   example: "420158066212864"

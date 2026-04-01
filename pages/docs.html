@@ -924,24 +924,38 @@ def generate_nexus_jwt(jwt_secret: str, app_id: str, user_id: str) -> str:
                         </tr>
                     </tbody>
                 </table>
-                <div class="callout">
-                    <p><strong>Note:</strong> Internal routes are only registered when <strong>both</strong>
-                        <code>http.internal_routes: true</code> and a non-empty <code>http.internal_api_key</code>
-                        are configured. Every request to an internal endpoint must include the header
-                        <code>X-Internal-Key: &lt;your-key&gt;</code>.</p>
-                </div>
+
+                <h3>Required Headers</h3>
+                <p>Every internal request must include both headers:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Header</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>X-Internal-Key</code></td>
+                            <td>Must match <code>http.internal_api_key</code>. Returns <code>401</code> if missing or incorrect.</td>
+                        </tr>
+                        <tr>
+                            <td><code>X-App-ID</code></td>
+                            <td>Tenant/app ID. Returns <code>400</code> if missing.</td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <h3>User Registration</h3>
                 <p>Syncs a user from an external auth service into Nexus. Creates the user if they don't exist,
-                    or returns the existing record, and issues a fresh JWT. <code>name</code> and
-                    <code>app_id</code> are optional.</p>
+                    or returns the existing record, and issues a fresh JWT. <code>name</code> is optional.</p>
                 <pre><code>POST /internal/v1/auth/register
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
   "email": "user@example.com",
-  "name": "John Doe",
-  "app_id": "myapp"
+  "name": "John Doe"
 }
 
 // Response (200 OK)
@@ -954,17 +968,17 @@ X-Internal-Key: your-internal-api-key
 }</code></pre>
 
                 <h3>Messages</h3>
-                <p>Internal counterparts for the full message lifecycle. All endpoints require
-                    <code>app_id</code> and the acting user's ID in the request body.</p>
+                <p>Internal counterparts for the full message lifecycle. The acting user's ID is supplied
+                    in the request body.</p>
 
                 <h4>Send Message</h4>
                 <p>Send a group or private message on behalf of a user. <code>group_id</code> and
                     <code>user_id</code> are mutually exclusive.</p>
                 <pre><code>POST /internal/v1/messages/send
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "sender_id": "420158066212864",
   "group_id": "nexus_dev",
   "content": { "type": "text", "text": "Hello from external service!" }
@@ -980,9 +994,9 @@ X-Internal-Key: your-internal-api-key
                 <p>Only the original sender (<code>sender_id</code>) can edit a message.</p>
                 <pre><code>POST /internal/v1/messages/edit
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "sender_id": "420158066212864",
   "message_id": "420158066278400",
   "content": { "type": "text", "text": "Updated content" }
@@ -998,9 +1012,9 @@ X-Internal-Key: your-internal-api-key
                 <p>Only the original sender (<code>sender_id</code>) can delete a message.</p>
                 <pre><code>POST /internal/v1/messages/delete
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "sender_id": "420158066212864",
   "message_id": "420158066278400"
 }
@@ -1016,9 +1030,9 @@ X-Internal-Key: your-internal-api-key
                     <code>read</code>.</p>
                 <pre><code>POST /internal/v1/messages/ack
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "user_id": "420158066278401",
   "message_id": "420158066278400",
   "status": "read"
@@ -1031,16 +1045,15 @@ X-Internal-Key: your-internal-api-key
 }</code></pre>
 
                 <h3>Groups</h3>
-                <p>Internal counterparts for the full group management lifecycle. All endpoints require
-                    <code>app_id</code> and <code>user_id</code> in the request body (or query string for
-                    <code>GET</code>).</p>
+                <p>Internal counterparts for the full group management lifecycle. The acting user's ID is
+                    supplied in the request body (or query string for <code>GET</code>).</p>
 
                 <h4>Create Group</h4>
                 <pre><code>POST /internal/v1/groups/create
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "user_id": "420158066212864",
   "group_id": "nexus_dev",
   "name": "Nexus Development",
@@ -1055,8 +1068,9 @@ X-Internal-Key: your-internal-api-key
 
                 <h4>Get Group Detail</h4>
                 <p>The <code>user_id</code> must be a member of the group.</p>
-                <pre><code>GET /internal/v1/groups/detail?app_id=myapp&user_id=420158066212864&group_id=nexus_dev
+                <pre><code>GET /internal/v1/groups/detail?user_id=420158066212864&group_id=nexus_dev
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 // Response (200 OK)
 {
@@ -1074,9 +1088,9 @@ X-Internal-Key: your-internal-api-key
                 <p>The <code>user_id</code> must be a member of the group.</p>
                 <pre><code>POST /internal/v1/groups/update
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "user_id": "420158066212864",
   "group_id": "nexus_dev",
   "name": "Nexus Core",
@@ -1092,9 +1106,9 @@ X-Internal-Key: your-internal-api-key
                 <h4>Join Group</h4>
                 <pre><code>POST /internal/v1/groups/join
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "user_id": "420158066212864",
   "group_id": "nexus_dev"
 }
@@ -1108,9 +1122,9 @@ X-Internal-Key: your-internal-api-key
                 <h4>Leave Group</h4>
                 <pre><code>POST /internal/v1/groups/leave
 X-Internal-Key: your-internal-api-key
+X-App-ID: myapp
 
 {
-  "app_id": "myapp",
   "user_id": "420158066212864",
   "group_id": "nexus_dev"
 }
@@ -1334,7 +1348,23 @@ X-Internal-Key: your-internal-api-key
                         </tr>
                         <tr>
                             <td><code>internal/delivery/http/server.go</code></td>
-                            <td>HTTP server setup, Chi router, and global middleware stack.</td>
+                            <td>HTTP server setup, Chi router, global middleware stack, and route registration for public and internal endpoints.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/delivery/http/middleware.go</code></td>
+                            <td>HTTP middleware — CORS, logging, metrics, body limit, panic recovery, <code>InternalAPIKeyMiddleware</code>, and <code>AppIDMiddleware</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/delivery/http/auth_handler.go</code></td>
+                            <td>Internal user registration handler — syncs users from an external auth service and issues JWTs.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/delivery/http/message_handler.go</code></td>
+                            <td>Message lifecycle handlers for both the public JWT-authenticated and internal service-to-service endpoints.</td>
+                        </tr>
+                        <tr>
+                            <td><code>internal/delivery/http/group_handler.go</code></td>
+                            <td>Group management handlers for both the public JWT-authenticated and internal service-to-service endpoints.</td>
                         </tr>
                         <tr>
                             <td><code>internal/delivery/ws/handler.go</code></td>
