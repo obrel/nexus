@@ -24,6 +24,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            nexus-${{ github.ref_name }}
+            nexus-${{ github.ref_name }}-linux-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
