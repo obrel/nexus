@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/obrel/nexus/internal/domain"
 	"github.com/obrel/nexus/internal/infra/logger"
 	"github.com/obrel/nexus/internal/infra/metrics"
 )
@@ -36,7 +37,7 @@ func CORSMiddleware() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Internal-Key, X-App-ID")
 
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusOK)
@@ -75,6 +76,22 @@ func BodyLimitMiddleware(maxBytes int64) func(http.Handler) http.Handler {
 				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// AppIDMiddleware extracts the X-App-ID header and injects it into the request context.
+// Returns 400 if the header is missing or empty.
+func AppIDMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			appID := r.Header.Get("X-App-ID")
+			if appID == "" {
+				respondError(w, http.StatusBadRequest, "missing_app_id")
+				return
+			}
+			ctx := domain.WithAppID(r.Context(), appID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

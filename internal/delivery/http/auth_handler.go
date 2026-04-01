@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/obrel/nexus/internal/domain"
 	"github.com/obrel/nexus/internal/infra/logger"
 	"github.com/obrel/nexus/internal/usecase"
 )
@@ -13,10 +14,14 @@ import (
 func NewInternalRegisterHandler(uc usecase.AuthUseCase, defaultAppID string) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
+		appID := domain.AppIDFromContext(r.Context())
+		if appID == "" {
+			appID = defaultAppID
+		}
+
 		var req struct {
 			Email string `json:"email"`
 			Name  string `json:"name"`
-			AppID string `json:"app_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
@@ -26,11 +31,8 @@ func NewInternalRegisterHandler(uc usecase.AuthUseCase, defaultAppID string) htt
 			respondError(w, http.StatusBadRequest, "email_required")
 			return
 		}
-		if req.AppID == "" {
-			req.AppID = defaultAppID
-		}
 
-		token, userID, err := uc.RegisterUser(r.Context(), req.AppID, req.Email, req.Name)
+		token, userID, err := uc.RegisterUser(r.Context(), appID, req.Email, req.Name)
 		if err != nil {
 			log.Errorf("Failed to register user: %v", err)
 			respondError(w, http.StatusInternalServerError, "register_failed")

@@ -15,9 +15,9 @@ func NewInternalGroupCreateHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID       string `json:"app_id"`
 			UserID      string `json:"user_id"`
 			GroupID     string `json:"group_id"`
 			Name        string `json:"name"`
@@ -25,10 +25,6 @@ func NewInternalGroupCreateHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.UserID == "" {
@@ -48,7 +44,7 @@ func NewInternalGroupCreateHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.Create(ctx, req.AppID, req.UserID, req.GroupID, req.Name, req.Description); err != nil {
+		if err := uc.Create(ctx, appID, req.UserID, req.GroupID, req.Name, req.Description); err != nil {
 			log.Errorf("Failed to create group (internal): %v", err)
 			if errors.Is(err, domain.ErrAlreadyExists) {
 				respondError(w, http.StatusConflict, "group_already_exists")
@@ -70,15 +66,11 @@ func NewInternalGroupGetHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
-		appID := r.URL.Query().Get("app_id")
 		userID := r.URL.Query().Get("user_id")
 		groupID := r.URL.Query().Get("group_id")
 
-		if appID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
-			return
-		}
 		if userID == "" {
 			respondError(w, http.StatusBadRequest, "user_id_required")
 			return
@@ -125,9 +117,9 @@ func NewInternalGroupUpdateHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID       string `json:"app_id"`
 			UserID      string `json:"user_id"`
 			GroupID     string `json:"group_id"`
 			Name        string `json:"name"`
@@ -135,10 +127,6 @@ func NewInternalGroupUpdateHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.UserID == "" {
@@ -154,7 +142,7 @@ func NewInternalGroupUpdateHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.Update(ctx, req.AppID, req.UserID, req.GroupID, req.Name, req.Description); err != nil {
+		if err := uc.Update(ctx, appID, req.UserID, req.GroupID, req.Name, req.Description); err != nil {
 			log.Errorf("Failed to update group (internal): %v", err)
 			if errors.Is(err, domain.ErrNotFound) {
 				respondError(w, http.StatusNotFound, "group_not_found")
@@ -180,18 +168,14 @@ func NewInternalGroupJoinHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID   string `json:"app_id"`
 			UserID  string `json:"user_id"`
 			GroupID string `json:"group_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.UserID == "" {
@@ -207,7 +191,7 @@ func NewInternalGroupJoinHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.Join(ctx, req.AppID, req.UserID, req.GroupID); err != nil {
+		if err := uc.Join(ctx, appID, req.UserID, req.GroupID); err != nil {
 			log.Errorf("Failed to join group (internal): %v", err)
 			if errors.Is(err, domain.ErrNotFound) {
 				respondError(w, http.StatusNotFound, "group_not_found")
@@ -229,18 +213,14 @@ func NewInternalGroupLeaveHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID   string `json:"app_id"`
 			UserID  string `json:"user_id"`
 			GroupID string `json:"group_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.UserID == "" {
@@ -256,7 +236,7 @@ func NewInternalGroupLeaveHandler(uc usecase.GroupUseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.Leave(ctx, req.AppID, req.UserID, req.GroupID); err != nil {
+		if err := uc.Leave(ctx, appID, req.UserID, req.GroupID); err != nil {
 			log.Errorf("Failed to leave group (internal): %v", err)
 			respondError(w, http.StatusInternalServerError, "leave_failed")
 			return

@@ -98,15 +98,15 @@ func NewMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 }
 
 // NewInternalMessageSendHandler creates an HTTP handler for POST /internal/v1/messages/send.
-// It is intended for service-to-service use; the caller supplies app_id and sender_id explicitly
-// instead of relying on JWT claims.
+// It is intended for service-to-service use; app_id is supplied via X-App-ID header and
+// sender_id is supplied in the request body instead of relying on JWT claims.
 func NewInternalMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID    string          `json:"app_id"`
 			SenderID string          `json:"sender_id"`
 			GroupID  string          `json:"group_id"`
 			UserID   string          `json:"user_id"`
@@ -114,10 +114,6 @@ func NewInternalMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.SenderID == "" {
@@ -159,7 +155,7 @@ func NewInternalMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 		}
 
 		msg := &domain.Message{
-			AppID:         req.AppID,
+			AppID:         appID,
 			RecipientType: rt,
 			RecipientID:   recipientID,
 			Content:       req.Content,
@@ -167,7 +163,7 @@ func NewInternalMessageSendHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 			SenderID:      req.SenderID,
 		}
 
-		if err := uc.Send(ctx, req.AppID, msg); err != nil {
+		if err := uc.Send(ctx, appID, msg); err != nil {
 			log.Errorf("Failed to send internal message: %v", err)
 			if errors.Is(err, domain.ErrAccessDenied) {
 				respondError(w, http.StatusForbidden, "not_a_member")
@@ -192,19 +188,15 @@ func NewInternalMessageEditHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID     string          `json:"app_id"`
 			SenderID  string          `json:"sender_id"`
 			MessageID string          `json:"message_id"`
 			Content   json.RawMessage `json:"content"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.SenderID == "" {
@@ -230,7 +222,7 @@ func NewInternalMessageEditHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.Edit(ctx, req.AppID, req.SenderID, msgID, string(req.Content)); err != nil {
+		if err := uc.Edit(ctx, appID, req.SenderID, msgID, string(req.Content)); err != nil {
 			log.Errorf("Failed to edit message (internal): %v", err)
 			respondError(w, http.StatusInternalServerError, "edit_failed")
 			return
@@ -249,18 +241,14 @@ func NewInternalMessageDeleteHandler(uc usecase.MessageUseCase) http.HandlerFunc
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID     string `json:"app_id"`
 			SenderID  string `json:"sender_id"`
 			MessageID string `json:"message_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.SenderID == "" {
@@ -278,7 +266,7 @@ func NewInternalMessageDeleteHandler(uc usecase.MessageUseCase) http.HandlerFunc
 			return
 		}
 
-		if err := uc.Delete(ctx, req.AppID, req.SenderID, msgID); err != nil {
+		if err := uc.Delete(ctx, appID, req.SenderID, msgID); err != nil {
 			log.Errorf("Failed to delete message (internal): %v", err)
 			respondError(w, http.StatusInternalServerError, "delete_failed")
 			return
@@ -297,19 +285,15 @@ func NewInternalMessageAckHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 	log := logger.For("delivery", "http")
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		appID := domain.AppIDFromContext(ctx)
 
 		var req struct {
-			AppID     string `json:"app_id"`
 			UserID    string `json:"user_id"`
 			MessageID string `json:"message_id"`
 			Status    string `json:"status"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respondError(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-		if req.AppID == "" {
-			respondError(w, http.StatusBadRequest, "app_id_required")
 			return
 		}
 		if req.UserID == "" {
@@ -337,7 +321,7 @@ func NewInternalMessageAckHandler(uc usecase.MessageUseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.Ack(ctx, req.AppID, req.UserID, msgID, status); err != nil {
+		if err := uc.Ack(ctx, appID, req.UserID, msgID, status); err != nil {
 			log.Errorf("Failed to ack message (internal): %v", err)
 			respondError(w, http.StatusInternalServerError, "ack_failed")
 			return
