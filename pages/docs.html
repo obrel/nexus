@@ -325,6 +325,7 @@
                 <li><a href="#messages">Messages</a></li>
                 <li><a href="#groups">Groups</a></li>
                 <li><a href="#history">History</a></li>
+                <li><a href="#internal-api">Internal API</a></li>
             </ul>
 
             <h3>WebSockets</h3>
@@ -535,6 +536,11 @@ cd nexus</code></pre>
                             <td>Shared secret for internal service-to-service calls (required in production, min 32 chars).</td>
                         </tr>
                         <tr>
+                            <td><code>http.internal_routes</code></td>
+                            <td>true</td>
+                            <td>Enable or disable all <code>/internal/*</code> endpoints. Set to <code>false</code> to prevent any service-to-service access.</td>
+                        </tr>
+                        <tr>
                             <td><code>http.max_body_size</code></td>
                             <td>1MB</td>
                             <td>Maximum size for request bodies.</td>
@@ -668,7 +674,7 @@ cd nexus</code></pre>
                 <p>Nexus uses JWT (HS256) for authenticating all API requests and WebSocket connections. Tokens
                     are passed via the <code>Authorization: Bearer &lt;token&gt;</code> header.</p>
                 <p>Nexus does not provide user registration or login flows. Developers implement their own
-                    auth service and use the <a href="#internal-auth">internal authentication API</a> to sync
+                    auth service and use the <a href="#internal-api">internal API</a> to sync
                     users into Nexus.</p>
 
                 <h3>JWT Format</h3>
@@ -758,44 +764,12 @@ def generate_nexus_jwt(jwt_secret: str, app_id: str, user_id: str) -> str:
                 </div>
             </section>
 
-            <section id="internal-auth">
-                <h2>Internal Authentication (Service-to-Service)</h2>
-                <p>Developers implement their own auth service and use this internal API to sync users
-                    into the Nexus <code>users</code> table. The endpoint creates the user if they don't
-                    exist and returns a JWT.</p>
-                <p>Authenticated via <code>X-Internal-Key</code> header instead of JWT.</p>
-
-                <h3>Registration (Internal)</h3>
-                <pre><code>POST /internal/v1/auth/register
-X-Internal-Key: your-internal-api-key
-
-{
-  "email": "user@example.com",
-  "name": "John Doe",
-  "app_id": "myapp"
-}
-
-// Response (200 OK)
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "user_id": "420158066212864"
-  }
-}</code></pre>
-                <div class="callout">
-                    <p><strong>Note:</strong> This endpoint is for service-to-service calls only.
-                        The <code>X-Internal-Key</code> must match the configured <code>http.internal_api_key</code>.
-                        If the user already exists, the existing record is used and a fresh JWT is returned.
-                        <code>name</code> and <code>app_id</code> are optional.</p>
-                </div>
-            </section>
 
             <section id="messages">
                 <h2>Messages API</h2>
                 <p>All message operations are performed via the Ingress HTTP API. The same endpoint handles both group
                     and private messages. For messages originating from an external service, see the
-                    <a href="#internal-messages">internal send API</a>.</p>
+                    <a href="#internal-api">internal API</a>.</p>
 
                 <h3>Send Group Message</h3>
                 <p>The sender must be a member of the target group. Non-members receive
@@ -865,99 +839,10 @@ X-Internal-Key: your-internal-api-key
 }</code></pre>
             </section>
 
-            <section id="internal-messages">
-                <h2>Internal Messages API (Service-to-Service)</h2>
-                <p>For use cases where message operations originate from an external service — not directly from the
-                    client — Nexus exposes internal counterparts for the full message lifecycle. This avoids requiring
-                    the external service to hold or forward a user's JWT token.</p>
-                <p>All internal message endpoints are authenticated via <code>X-Internal-Key</code> header and require
-                    <code>app_id</code> plus the acting user's ID to be provided in the request body. Group membership
-                    rules apply as normal.</p>
-
-                <h3>Send Message</h3>
-                <p>Send a group or private message on behalf of a user. <code>group_id</code> and
-                    <code>user_id</code> are mutually exclusive.</p>
-                <pre><code>POST /internal/v1/messages/send
-X-Internal-Key: your-internal-api-key
-
-{
-  "app_id": "myapp",
-  "sender_id": "420158066212864",
-  "group_id": "nexus_dev",
-  "content": { "type": "text", "text": "Hello from external service!" }
-}
-
-// Response (202 Accepted)
-{
-  "success": true,
-  "data": { "message_id": "420158066278400" }
-}</code></pre>
-
-                <h3>Edit Message</h3>
-                <p>Edit the content of a message. Only the original sender (<code>sender_id</code>) can edit.</p>
-                <pre><code>POST /internal/v1/messages/edit
-X-Internal-Key: your-internal-api-key
-
-{
-  "app_id": "myapp",
-  "sender_id": "420158066212864",
-  "message_id": "420158066278400",
-  "content": { "type": "text", "text": "Updated content" }
-}
-
-// Response (200 OK)
-{
-  "success": true,
-  "data": { "message_id": "420158066278400" }
-}</code></pre>
-
-                <h3>Delete Message</h3>
-                <p>Soft-delete a message. Only the original sender (<code>sender_id</code>) can delete.</p>
-                <pre><code>POST /internal/v1/messages/delete
-X-Internal-Key: your-internal-api-key
-
-{
-  "app_id": "myapp",
-  "sender_id": "420158066212864",
-  "message_id": "420158066278400"
-}
-
-// Response (200 OK)
-{
-  "success": true,
-  "data": { "message_id": "420158066278400" }
-}</code></pre>
-
-                <h3>Acknowledge Message</h3>
-                <p>Record a delivery status on behalf of a user. Valid statuses: <code>received</code>,
-                    <code>read</code>.</p>
-                <pre><code>POST /internal/v1/messages/ack
-X-Internal-Key: your-internal-api-key
-
-{
-  "app_id": "myapp",
-  "user_id": "420158066278401",
-  "message_id": "420158066278400",
-  "status": "read"
-}
-
-// Response (200 OK)
-{
-  "success": true,
-  "data": {}
-}</code></pre>
-
-                <div class="callout">
-                    <p><strong>Note:</strong> <code>app_id</code> and the acting user ID (<code>sender_id</code> or
-                        <code>user_id</code>) are required on all internal message endpoints. User IDs must be valid
-                        Nexus user IDs returned by
-                        <a href="#auth-register"><code>/internal/v1/auth/register</code></a>.</p>
-                </div>
-            </section>
 
             <section id="groups">
                 <h2>Groups API</h2>
-                <p>For service-to-service group management, see the <a href="#internal-groups">internal groups API</a>.</p>
+                <p>For service-to-service group management, see the <a href="#internal-api">internal API</a>.</p>
 
                 <h3>Create Group</h3>
                 <pre><code>POST /v1/groups/create
@@ -1009,13 +894,148 @@ X-Internal-Key: your-internal-api-key
 }</code></pre>
             </section>
 
-            <section id="internal-groups">
-                <h2>Internal Groups API (Service-to-Service)</h2>
-                <p>Internal counterparts for the full group management lifecycle. All endpoints require
-                    <code>app_id</code> and <code>user_id</code> in the request body (or query string for GET)
-                    instead of JWT claims, and are authenticated via <code>X-Internal-Key</code> header.</p>
+            <section id="internal-api">
+                <h2>Internal API (Service-to-Service)</h2>
+                <p>Nexus exposes a set of internal endpoints under <code>/internal/v1/</code> for
+                    service-to-service communication. These allow an external service to perform operations
+                    on behalf of a user without requiring a JWT token — the acting user's identity is supplied
+                    explicitly in the request body instead.</p>
 
-                <h3>Create Group</h3>
+                <h3>Configuration</h3>
+                <p>Internal routes are controlled by two settings in <code>config.yaml</code>:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Setting</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>http.internal_routes</code></td>
+                            <td><code>true</code></td>
+                            <td>Master switch. Set to <code>false</code> to disable all <code>/internal/*</code> endpoints entirely.</td>
+                        </tr>
+                        <tr>
+                            <td><code>http.internal_api_key</code></td>
+                            <td>—</td>
+                            <td>Shared secret that callers must supply via the <code>X-Internal-Key</code> header. Required in production (min 32 chars). Routes are not registered if this is empty.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="callout">
+                    <p><strong>Note:</strong> Internal routes are only registered when <strong>both</strong>
+                        <code>http.internal_routes: true</code> and a non-empty <code>http.internal_api_key</code>
+                        are configured. Every request to an internal endpoint must include the header
+                        <code>X-Internal-Key: &lt;your-key&gt;</code>.</p>
+                </div>
+
+                <h3>User Registration</h3>
+                <p>Syncs a user from an external auth service into Nexus. Creates the user if they don't exist,
+                    or returns the existing record, and issues a fresh JWT. <code>name</code> and
+                    <code>app_id</code> are optional.</p>
+                <pre><code>POST /internal/v1/auth/register
+X-Internal-Key: your-internal-api-key
+
+{
+  "email": "user@example.com",
+  "name": "John Doe",
+  "app_id": "myapp"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "420158066212864"
+  }
+}</code></pre>
+
+                <h3>Messages</h3>
+                <p>Internal counterparts for the full message lifecycle. All endpoints require
+                    <code>app_id</code> and the acting user's ID in the request body.</p>
+
+                <h4>Send Message</h4>
+                <p>Send a group or private message on behalf of a user. <code>group_id</code> and
+                    <code>user_id</code> are mutually exclusive.</p>
+                <pre><code>POST /internal/v1/messages/send
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "sender_id": "420158066212864",
+  "group_id": "nexus_dev",
+  "content": { "type": "text", "text": "Hello from external service!" }
+}
+
+// Response (202 Accepted)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h4>Edit Message</h4>
+                <p>Only the original sender (<code>sender_id</code>) can edit a message.</p>
+                <pre><code>POST /internal/v1/messages/edit
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "sender_id": "420158066212864",
+  "message_id": "420158066278400",
+  "content": { "type": "text", "text": "Updated content" }
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h4>Delete Message</h4>
+                <p>Only the original sender (<code>sender_id</code>) can delete a message.</p>
+                <pre><code>POST /internal/v1/messages/delete
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "sender_id": "420158066212864",
+  "message_id": "420158066278400"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": { "message_id": "420158066278400" }
+}</code></pre>
+
+                <h4>Acknowledge Message</h4>
+                <p>Record a delivery status on behalf of a user. Valid statuses: <code>received</code>,
+                    <code>read</code>.</p>
+                <pre><code>POST /internal/v1/messages/ack
+X-Internal-Key: your-internal-api-key
+
+{
+  "app_id": "myapp",
+  "user_id": "420158066278401",
+  "message_id": "420158066278400",
+  "status": "read"
+}
+
+// Response (200 OK)
+{
+  "success": true,
+  "data": {}
+}</code></pre>
+
+                <h3>Groups</h3>
+                <p>Internal counterparts for the full group management lifecycle. All endpoints require
+                    <code>app_id</code> and <code>user_id</code> in the request body (or query string for
+                    <code>GET</code>).</p>
+
+                <h4>Create Group</h4>
                 <pre><code>POST /internal/v1/groups/create
 X-Internal-Key: your-internal-api-key
 
@@ -1033,7 +1053,7 @@ X-Internal-Key: your-internal-api-key
   "data": { "group_id": "nexus_dev" }
 }</code></pre>
 
-                <h3>Get Group Detail</h3>
+                <h4>Get Group Detail</h4>
                 <p>The <code>user_id</code> must be a member of the group.</p>
                 <pre><code>GET /internal/v1/groups/detail?app_id=myapp&user_id=420158066212864&group_id=nexus_dev
 X-Internal-Key: your-internal-api-key
@@ -1050,7 +1070,7 @@ X-Internal-Key: your-internal-api-key
   }
 }</code></pre>
 
-                <h3>Update Group</h3>
+                <h4>Update Group</h4>
                 <p>The <code>user_id</code> must be a member of the group.</p>
                 <pre><code>POST /internal/v1/groups/update
 X-Internal-Key: your-internal-api-key
@@ -1069,7 +1089,7 @@ X-Internal-Key: your-internal-api-key
   "data": { "group_id": "nexus_dev" }
 }</code></pre>
 
-                <h3>Join Group</h3>
+                <h4>Join Group</h4>
                 <pre><code>POST /internal/v1/groups/join
 X-Internal-Key: your-internal-api-key
 
@@ -1085,7 +1105,7 @@ X-Internal-Key: your-internal-api-key
   "data": { "group_id": "nexus_dev" }
 }</code></pre>
 
-                <h3>Leave Group</h3>
+                <h4>Leave Group</h4>
                 <pre><code>POST /internal/v1/groups/leave
 X-Internal-Key: your-internal-api-key
 
@@ -1100,12 +1120,6 @@ X-Internal-Key: your-internal-api-key
   "success": true,
   "data": { "group_id": "nexus_dev" }
 }</code></pre>
-
-                <div class="callout">
-                    <p><strong>Note:</strong> <code>app_id</code> and <code>user_id</code> are required on all
-                        internal group endpoints. User IDs must be valid Nexus user IDs returned by
-                        <a href="#auth-register"><code>/internal/v1/auth/register</code></a>.</p>
-                </div>
             </section>
 
             <section id="history">

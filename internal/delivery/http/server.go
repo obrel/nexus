@@ -19,6 +19,7 @@ type Server struct {
 	r              chi.Router
 	jwtSecret      string
 	internalAPIKey string
+	internalRoutes bool
 }
 
 // New creates a new HTTP Server. The router is available for attaching handlers and middleware.
@@ -51,6 +52,7 @@ func New(cfg *config.HTTPConfig) *Server {
 		r:              r,
 		jwtSecret:      cfg.JWTSecret,
 		internalAPIKey: cfg.InternalAPIKey,
+		internalRoutes: cfg.InternalRoutes,
 	}
 }
 
@@ -79,7 +81,7 @@ func (s *Server) RegisterRoutes(
 	s.r.Get("/docs/openapi.yaml", OpenAPISpecHandler())
 
 	// Internal routes (API key required) — service-to-service
-	if s.internalAPIKey != "" {
+	if s.internalRoutes && s.internalAPIKey != "" {
 		s.r.Group(func(r chi.Router) {
 			r.Use(InternalAPIKeyMiddleware(s.internalAPIKey))
 			r.Post("/internal/v1/auth/register", NewInternalRegisterHandler(authUC, defaultAppID))

@@ -247,6 +247,9 @@ paths:
         Service-to-service endpoint for syncing users from an external auth service into Nexus.
         Creates the user if they don't exist, or retrieves them if they do, and returns a JWT.
         Authenticated via `X-Internal-Key` header.
+
+        > All `/internal/*` endpoints are only registered when **both** `http.internal_routes: true`
+        > and `http.internal_api_key` are set in the server configuration.
       operationId: registerUser
       parameters:
         - in: header

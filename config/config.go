@@ -32,6 +32,7 @@ type HTTPConfig struct {
 	Port           int    `mapstructure:"port"`
 	JWTSecret      string `mapstructure:"jwt_secret"`
 	InternalAPIKey string `mapstructure:"internal_api_key"` // shared secret for internal service-to-service calls
+	InternalRoutes bool   `mapstructure:"internal_routes"`  // enable /internal/* endpoints
 	MaxBodySize    int64  `mapstructure:"max_body_size"`    // bytes; 0 = use default (1MB)
 	MaxHeaderBytes int    `mapstructure:"max_header_bytes"` // bytes; 0 = use default (1MB)
 }
@@ -114,6 +115,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("http.port", 8080)
 	viper.SetDefault("http.jwt_secret", "dev-secret-key-change-in-production")
 	viper.SetDefault("http.internal_api_key", "dev-internal-key-change-in-production")
+	viper.SetDefault("http.internal_routes", true)
 	viper.SetDefault("http.max_body_size", 1<<20)    // 1MB
 	viper.SetDefault("http.max_header_bytes", 1<<20) // 1MB
 	viper.SetDefault("ws.port", 8081)
