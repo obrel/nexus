@@ -1,4 +1,38 @@
 services:
+  mysql:
+    image: mysql:latest
+    network_mode: "host"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=nexus
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+
+  redis:
+    image: redis:latest
+    network_mode: "host"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  nats:
+    image: nats:latest
+    network_mode: "host"
+    restart: always
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["migrate", "up"]
+    network_mode: "host"
+    environment:
+      - APP_ENV=development
+    depends_on:
+      - mysql
+    restart: "no"
+
   nexus-http:
     build:
       context: .
@@ -8,6 +42,10 @@ services:
     environment:
       - APP_ENV=development
       - HTTP_PORT=8080
+    depends_on:
+      - migrate
+      - redis
+      - nats
     restart: always
 
   nexus-ws:
@@ -19,6 +57,10 @@ services:
     environment:
       - APP_ENV=development
       - WS_PORT=8081
+    depends_on:
+      - migrate
+      - redis
+      - nats
     restart: always
 
   nexus-worker:
@@ -29,4 +71,12 @@ services:
     network_mode: "host"
     environment:
       - APP_ENV=development
+    depends_on:
+      - migrate
+      - redis
+      - nats
     restart: always
+
+volumes:
+  redis_data:
+  mysql_data:
