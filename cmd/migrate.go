@@ -5,10 +5,33 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/mysql"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/obrel/nexus/db"
 	"github.com/obrel/nexus/internal/infra/logger"
 	"github.com/spf13/cobra"
 )
+
+// newMigrator creates a migrate instance using the embedded SQL files.
+func newMigrator() (*migrate.Migrate, error) {
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true",
+		cfg.MySQL.User,
+		cfg.MySQL.Password,
+		cfg.MySQL.Host,
+		cfg.MySQL.Port,
+		cfg.MySQL.DBName,
+	)
+
+	src, err := iofs.New(db.MigrationsFS, "migrations/mysql")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open embedded migrations: %w", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", src, "mysql://"+dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create migrator: %w", err)
+	}
+	return m, nil
+}
 
 var (
 	migrateCmd = &cobra.Command{
@@ -26,18 +49,9 @@ var (
 
 			log := logger.For("infra", "migrate")
 
-			// Build MySQL DSN
-			dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true",
-				cfg.MySQL.User,
-				cfg.MySQL.Password,
-				cfg.MySQL.Host,
-				cfg.MySQL.Port,
-				cfg.MySQL.DBName,
-			)
-
-			m, err := migrate.New("file://db/migrations/mysql", "mysql://"+dsn)
+			m, err := newMigrator()
 			if err != nil {
-				return fmt.Errorf("failed to create migrator: %w", err)
+				return err
 			}
 			defer m.Close()
 
@@ -64,18 +78,9 @@ var (
 
 			log := logger.For("infra", "migrate")
 
-			// Build MySQL DSN
-			dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true",
-				cfg.MySQL.User,
-				cfg.MySQL.Password,
-				cfg.MySQL.Host,
-				cfg.MySQL.Port,
-				cfg.MySQL.DBName,
-			)
-
-			m, err := migrate.New("file://db/migrations/mysql", "mysql://"+dsn)
+			m, err := newMigrator()
 			if err != nil {
-				return fmt.Errorf("failed to create migrator: %w", err)
+				return err
 			}
 			defer m.Close()
 
@@ -108,17 +113,9 @@ var (
 				return fmt.Errorf("invalid version: %s", args[0])
 			}
 
-			dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true",
-				cfg.MySQL.User,
-				cfg.MySQL.Password,
-				cfg.MySQL.Host,
-				cfg.MySQL.Port,
-				cfg.MySQL.DBName,
-			)
-
-			m, err := migrate.New("file://db/migrations/mysql", "mysql://"+dsn)
+			m, err := newMigrator()
 			if err != nil {
-				return fmt.Errorf("failed to create migrator: %w", err)
+				return err
 			}
 			defer m.Close()
 
@@ -141,18 +138,9 @@ var (
 
 			log := logger.For("infra", "migrate")
 
-			// Build MySQL DSN
-			dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true",
-				cfg.MySQL.User,
-				cfg.MySQL.Password,
-				cfg.MySQL.Host,
-				cfg.MySQL.Port,
-				cfg.MySQL.DBName,
-			)
-
-			m, err := migrate.New("file://db/migrations/mysql", "mysql://"+dsn)
+			m, err := newMigrator()
 			if err != nil {
-				return fmt.Errorf("failed to create migrator: %w", err)
+				return err
 			}
 			defer m.Close()
 
