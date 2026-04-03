@@ -64,8 +64,8 @@ func TestHandler_MissingSubProtocol(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected dial to fail with missing protocol")
 	}
-	if resp != nil && resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400", resp.StatusCode)
+	if resp != nil && resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", resp.StatusCode)
 	}
 }
 
