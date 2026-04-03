@@ -17,6 +17,12 @@ type PublishRepository interface {
 	SaveTx(ctx context.Context, msg *Message, outbox *OutboxEntry) error
 }
 
+// OutboxWriter inserts a standalone outbox entry without an associated message row.
+// Used for transient custom events that must not be saved to the messages table.
+type OutboxWriter interface {
+	Save(ctx context.Context, entry *OutboxEntry) error
+}
+
 // OutboxRepository handles relay-worker access to the outbox table.
 // ProcessBatch fetches up to `limit` pending rows with SELECT FOR UPDATE SKIP LOCKED,
 // calls fn with the entire batch, then marks all rows published (fn returns nil)

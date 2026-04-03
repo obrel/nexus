@@ -70,18 +70,19 @@ func (r *PublishRepository) SaveTx(ctx context.Context, msg *domain.Message, out
 
 	// Insert outbox entry
 	const insertOutboxSQL = `
-		INSERT INTO outbox (id, app_id, message_id, nats_subject, payload, status, retry_count, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO outbox (id, app_id, data_type, data_id, nats_subject, payload, status, retry_count, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = tx.ExecContext(ctx, insertOutboxSQL,
 		outbox.ID,
 		outbox.AppID,
-		outbox.MessageID,
+		outbox.DataType,
+		outbox.DataID,
 		outbox.NATSSubject,
-		outbox.Payload,    // message body for NATS publish
-		outbox.Status,     // should be "pending"
-		0,                 // retry_count
+		outbox.Payload,
+		outbox.Status, // should be "pending"
+		0,             // retry_count
 		outbox.CreatedAt,
 	)
 	if err != nil {

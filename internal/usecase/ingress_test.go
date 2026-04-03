@@ -27,6 +27,17 @@ func (m *mockPublishRepository) SaveTx(_ context.Context, msg *domain.Message, o
 	return m.returnErr
 }
 
+// mockOutboxWriter records Save calls for standalone outbox entries.
+type mockOutboxWriter struct {
+	saved     *domain.OutboxEntry
+	returnErr error
+}
+
+func (m *mockOutboxWriter) Save(_ context.Context, entry *domain.OutboxEntry) error {
+	m.saved = entry
+	return m.returnErr
+}
+
 // mockUserGroupRepository always returns isMember for IsMember calls.
 type mockUserGroupRepository struct {
 	isMember bool
@@ -56,7 +67,7 @@ func newTestUseCase(t *testing.T, repo domain.PublishRepository) MessageUseCase 
 	}
 	ring := hash.New(1024)
 	ugRepo := &mockUserGroupRepository{isMember: true}
-	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, sf, ring)
+	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, &mockOutboxWriter{}, sf, ring)
 	if err != nil {
 		t.Fatalf("NewMessageUseCase: %v", err)
 	}
@@ -78,7 +89,7 @@ func TestNewMessageUseCase_NilRepo(t *testing.T) {
 	sf, _ := snowflake.New()
 	ring := hash.New(1024)
 	ugRepo := &mockUserGroupRepository{isMember: true}
-	_, err := NewMessageUseCase(nil, nil, nil, ugRepo, sf, ring)
+	_, err := NewMessageUseCase(nil, nil, nil, ugRepo, &mockOutboxWriter{}, sf, ring)
 	if err == nil {
 		t.Fatal("expected error for nil publishRepo, got nil")
 	}
@@ -87,7 +98,7 @@ func TestNewMessageUseCase_NilRepo(t *testing.T) {
 func TestNewMessageUseCase_NilUserGroupRepo(t *testing.T) {
 	sf, _ := snowflake.New()
 	ring := hash.New(1024)
-	_, err := NewMessageUseCase(&mockPublishRepository{}, nil, nil, nil, sf, ring)
+	_, err := NewMessageUseCase(&mockPublishRepository{}, nil, nil, nil, &mockOutboxWriter{}, sf, ring)
 	if err == nil {
 		t.Fatal("expected error for nil userGroupRepo, got nil")
 	}
@@ -96,7 +107,7 @@ func TestNewMessageUseCase_NilUserGroupRepo(t *testing.T) {
 func TestNewMessageUseCase_NilSnowflake(t *testing.T) {
 	ring := hash.New(1024)
 	ugRepo := &mockUserGroupRepository{isMember: true}
-	_, err := NewMessageUseCase(&mockPublishRepository{}, nil, nil, ugRepo, nil, ring)
+	_, err := NewMessageUseCase(&mockPublishRepository{}, nil, nil, ugRepo, &mockOutboxWriter{}, nil, ring)
 	if err == nil {
 		t.Fatal("expected error for nil snowflake, got nil")
 	}
@@ -105,7 +116,7 @@ func TestNewMessageUseCase_NilSnowflake(t *testing.T) {
 func TestNewMessageUseCase_NilRing(t *testing.T) {
 	sf, _ := snowflake.New()
 	ugRepo := &mockUserGroupRepository{isMember: true}
-	_, err := NewMessageUseCase(&mockPublishRepository{}, nil, nil, ugRepo, sf, nil)
+	_, err := NewMessageUseCase(&mockPublishRepository{}, nil, nil, ugRepo, &mockOutboxWriter{}, sf, nil)
 	if err == nil {
 		t.Fatal("expected error for nil ring, got nil")
 	}
@@ -319,7 +330,7 @@ func BenchmarkPublish(b *testing.B) {
 	}
 	ring := hash.New(1024)
 	ugRepo := &mockUserGroupRepository{isMember: true}
-	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, sf, ring)
+	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, &mockOutboxWriter{}, sf, ring)
 	if err != nil {
 		b.Fatalf("NewMessageUseCase: %v", err)
 	}
@@ -336,7 +347,7 @@ func TestPublish_GroupMessage_NotAMember(t *testing.T) {
 	sf, _ := snowflake.New()
 	ring := hash.New(1024)
 	ugRepo := &mockUserGroupRepository{isMember: false}
-	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, sf, ring)
+	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, &mockOutboxWriter{}, sf, ring)
 	if err != nil {
 		t.Fatalf("NewMessageUseCase: %v", err)
 	}
@@ -356,7 +367,7 @@ func TestPublish_PrivateMessage_SkipsMembershipCheck(t *testing.T) {
 	sf, _ := snowflake.New()
 	ring := hash.New(1024)
 	ugRepo := &mockUserGroupRepository{isMember: false} // would fail if checked
-	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, sf, ring)
+	uc, err := NewMessageUseCase(repo, nil, nil, ugRepo, &mockOutboxWriter{}, sf, ring)
 	if err != nil {
 		t.Fatalf("NewMessageUseCase: %v", err)
 	}
@@ -372,7 +383,7 @@ func TestPublish_PrivateMessage_SkipsMembershipCheck(t *testing.T) {
 	}
 }
 
-func TestPublish_OutboxMessageIDMatchesMsgID(t *testing.T) {
+func TestPublish_OutboxDataIDMatchesMsgID(t *testing.T) {
 	repo := &mockPublishRepository{}
 	uc := newTestUseCase(t, repo)
 
@@ -381,8 +392,15 @@ func TestPublish_OutboxMessageIDMatchesMsgID(t *testing.T) {
 		t.Fatalf("Publish: %v", err)
 	}
 
-	if repo.savedOutbox.MessageID != msg.ID {
-		t.Errorf("outbox.MessageID=%d does not match msg.ID=%d", repo.savedOutbox.MessageID, msg.ID)
+	if repo.savedOutbox.DataType != domain.OutboxDataTypeMessage {
+		t.Errorf("outbox.DataType=%q, want %q", repo.savedOutbox.DataType, domain.OutboxDataTypeMessage)
+	}
+	if repo.savedOutbox.DataID == nil || *repo.savedOutbox.DataID != msg.ID {
+		var got uint64
+		if repo.savedOutbox.DataID != nil {
+			got = *repo.savedOutbox.DataID
+		}
+		t.Errorf("outbox.DataID=%d does not match msg.ID=%d", got, msg.ID)
 	}
 	if repo.savedOutbox.ID != msg.ID {
 		t.Errorf("outbox.ID=%d does not match msg.ID=%d", repo.savedOutbox.ID, msg.ID)

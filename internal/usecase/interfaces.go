@@ -34,6 +34,11 @@ type HistoryUseCase interface {
 	GetHistory(ctx context.Context, appID, userID string, recipientType domain.RecipientType, recipientID string, sinceID uint64, limit int) ([]*domain.Message, error)
 }
 
+// EventUseCase handles transient custom event dispatch via the outbox (no messages table row).
+type EventUseCase interface {
+	Send(ctx context.Context, appID, senderID string, evt *domain.CustomEvent) error
+}
+
 // AuthUseCase handles user registration and JWT issuance.
 type AuthUseCase interface {
 	// RegisterUser creates or retrieves a user by email and returns a JWT.

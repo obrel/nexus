@@ -53,18 +53,40 @@ func (m *Message) IsPrivate() bool {
 	return m.RecipientType == RecipientUser
 }
 
-// OutboxEntry represents a message queued for publishing to NATS.
+// OutboxDataType distinguishes the kind of data associated with an outbox entry.
+type OutboxDataType string
+
+const (
+	// OutboxDataTypeMessage indicates the outbox entry is linked to a message row.
+	OutboxDataTypeMessage OutboxDataType = "message"
+	// OutboxDataTypeEvent indicates a transient custom event with no associated message row.
+	OutboxDataTypeEvent OutboxDataType = "event"
+)
+
+// OutboxEntry represents an item queued for publishing to NATS.
+// DataType is polymorphic: 'message' rows carry a DataID (the message PK);
+// 'event' rows leave DataID nil since no message is persisted.
 type OutboxEntry struct {
-	ID          uint64     `json:"id"`
-	AppID       string     `json:"app_id"`
-	MessageID   uint64     `json:"message_id"`
-	NATSSubject string     `json:"nats_subject"`
-	Payload     string     `json:"payload"` // serialised message body published to NATS
-	Status      string     `json:"status"`  // pending | published | failed
-	RetryCount  int        `json:"retry_count"`
-	LastError   string     `json:"last_error,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	PublishedAt *time.Time `json:"published_at,omitempty"`
+	ID          uint64         `json:"id"`
+	AppID       string         `json:"app_id"`
+	DataType    OutboxDataType `json:"data_type"`
+	DataID      *uint64        `json:"data_id,omitempty"` // message ID for messages; nil for events
+	NATSSubject string         `json:"nats_subject"`
+	Payload     string         `json:"payload"` // serialised body published to NATS
+	Status      string         `json:"status"`  // pending | published | failed
+	RetryCount  int            `json:"retry_count"`
+	LastError   string         `json:"last_error,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	PublishedAt *time.Time     `json:"published_at,omitempty"`
+}
+
+// CustomEvent is the payload for a transient custom event sent via POST /v1/events/send.
+// It is never persisted to the messages table; the outbox entry carries only the NATS payload.
+type CustomEvent struct {
+	RecipientType RecipientType   `json:"recipient_type"`
+	RecipientID   string          `json:"recipient_id"`
+	EventType     string          `json:"type"`              // becomes "event" key in NATS envelope
+	Value         json.RawMessage `json:"value,omitempty"`   // optional object; nil → delivered as {}
 }
 
 // Group represents a chat group/channel.

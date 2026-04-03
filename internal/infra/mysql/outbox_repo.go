@@ -40,7 +40,7 @@ func (r *OutboxRepository) ProcessBatch(ctx context.Context, limit int, fn func(
 	defer tx.Rollback() //nolint:errcheck — superseded by explicit Commit
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, app_id, message_id, nats_subject, payload, retry_count
+		SELECT id, app_id, data_type, data_id, nats_subject, payload, retry_count
 		FROM outbox
 		WHERE status = 'pending'
 		ORDER BY created_at ASC
@@ -54,7 +54,7 @@ func (r *OutboxRepository) ProcessBatch(ctx context.Context, limit int, fn func(
 	var entries []*domain.OutboxEntry
 	for rows.Next() {
 		e := &domain.OutboxEntry{}
-		if err := rows.Scan(&e.ID, &e.AppID, &e.MessageID, &e.NATSSubject, &e.Payload, &e.RetryCount); err != nil {
+		if err := rows.Scan(&e.ID, &e.AppID, &e.DataType, &e.DataID, &e.NATSSubject, &e.Payload, &e.RetryCount); err != nil {
 			rows.Close()
 			return 0, fmt.Errorf("outbox: scan row: %w", err)
 		}

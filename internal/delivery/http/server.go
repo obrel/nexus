@@ -68,6 +68,7 @@ func (s *Server) RegisterRoutes(
 	profileUC usecase.ProfileUseCase,
 	historyUC usecase.HistoryUseCase,
 	authUC usecase.AuthUseCase,
+	eventUC usecase.EventUseCase,
 	defaultAppID string,
 	healthDeps *HealthDeps,
 ) {
@@ -121,6 +122,9 @@ func (s *Server) RegisterRoutes(
 
 		// History sync
 		r.Get("/v1/history", NewHistoryHandler(historyUC))
+
+		// Custom events
+		r.Post("/v1/events/send", NewEventSendHandler(eventUC))
 	})
 }
 

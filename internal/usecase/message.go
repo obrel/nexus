@@ -18,6 +18,7 @@ type messageUseCase struct {
 	msgRepo       domain.MessageRepository
 	statusRepo    domain.MessageStatusRepository
 	userGroupRepo domain.UserGroupRepository
+	outboxWriter  domain.OutboxWriter
 	snowflake     *snowflake.Generator
 	ring          *hash.Ring
 	log           logger.Logger
@@ -29,6 +30,7 @@ func NewMessageUseCase(
 	msgRepo domain.MessageRepository,
 	statusRepo domain.MessageStatusRepository,
 	userGroupRepo domain.UserGroupRepository,
+	outboxWriter domain.OutboxWriter,
 	sf *snowflake.Generator,
 	ring *hash.Ring,
 ) (MessageUseCase, error) {
@@ -37,6 +39,9 @@ func NewMessageUseCase(
 	}
 	if userGroupRepo == nil {
 		return nil, fmt.Errorf("userGroupRepo is required")
+	}
+	if outboxWriter == nil {
+		return nil, fmt.Errorf("outboxWriter is required")
 	}
 	if sf == nil {
 		return nil, fmt.Errorf("snowflake generator is required")
@@ -50,6 +55,7 @@ func NewMessageUseCase(
 		msgRepo:       msgRepo,
 		statusRepo:    statusRepo,
 		userGroupRepo: userGroupRepo,
+		outboxWriter:  outboxWriter,
 		snowflake:     sf,
 		ring:          ring,
 		log:           logger.For("usecase", "message"),
@@ -117,10 +123,12 @@ func (uc *messageUseCase) Send(ctx context.Context, appID string, msg *domain.Me
 		return fmt.Errorf("marshal MSG_NEW payload: %w", err)
 	}
 
+	msgID := id
 	outbox := &domain.OutboxEntry{
 		ID:          id,
 		AppID:       appID,
-		MessageID:   id,
+		DataType:    domain.OutboxDataTypeMessage,
+		DataID:      &msgID,
 		NATSSubject: natsSubject,
 		Payload:     string(eventPayload),
 		Status:      "pending",
@@ -180,15 +188,13 @@ func (uc *messageUseCase) Edit(ctx context.Context, appID, userID string, msgID 
 	outbox := &domain.OutboxEntry{
 		ID:          outboxID,
 		AppID:       appID,
-		MessageID:   msgID,
+		DataType:    domain.OutboxDataTypeMessage,
+		DataID:      &msgID,
 		NATSSubject: natsSubject,
 		Payload:     string(eventPayload),
 		Status:      "pending",
 	}
 
-	// Use publishRepo.SaveTx with a nil message to write only the outbox entry.
-	// Since SaveTx requires both, we save a dummy update via direct outbox insert.
-	// For now, we rely on the existing outbox relay to pick this up.
 	if err := uc.saveOutboxEntry(ctx, outbox); err != nil {
 		uc.log.Warnf("edit: outbox write failed for message %d: %v", msgID, err)
 	}
@@ -240,7 +246,8 @@ func (uc *messageUseCase) Delete(ctx context.Context, appID, userID string, msgI
 	outbox := &domain.OutboxEntry{
 		ID:          outboxID,
 		AppID:       appID,
-		MessageID:   msgID,
+		DataType:    domain.OutboxDataTypeMessage,
+		DataID:      &msgID,
 		NATSSubject: natsSubject,
 		Payload:     string(eventPayload),
 		Status:      "pending",
@@ -294,7 +301,8 @@ func (uc *messageUseCase) Ack(ctx context.Context, appID, userID string, msgID u
 	outbox := &domain.OutboxEntry{
 		ID:          outboxID,
 		AppID:       appID,
-		MessageID:   msgID,
+		DataType:    domain.OutboxDataTypeMessage,
+		DataID:      &msgID,
 		NATSSubject: natsSubject,
 		Payload:     string(eventPayload),
 		Status:      "pending",
@@ -308,25 +316,10 @@ func (uc *messageUseCase) Ack(ctx context.Context, appID, userID string, msgID u
 	return nil
 }
 
-// saveOutboxEntry inserts a standalone outbox entry (for events that don't create a new message).
+// saveOutboxEntry inserts a standalone outbox entry for message lifecycle events
+// (edit, delete, ack) that do not create a new message row.
 func (uc *messageUseCase) saveOutboxEntry(ctx context.Context, outbox *domain.OutboxEntry) error {
-	// We need a way to insert just an outbox row. The PublishRepository.SaveTx
-	// bundles message+outbox. For event-only outbox entries, we use MessageRepository.Save
-	// with a placeholder approach, or we add a direct outbox insert.
-	// For now, we use the message repo's underlying DB indirectly.
-	// TODO: Add an OutboxWriter interface for standalone outbox inserts.
-	// Temporarily, we'll create a minimal message + outbox via SaveTx.
-	dummyMsg := &domain.Message{
-		ID:            outbox.ID,
-		AppID:         outbox.AppID,
-		RecipientType: domain.RecipientGroup,
-		RecipientID:   "__event__",
-		ShardID:       0,
-		Content:       json.RawMessage(outbox.Payload),
-		SenderType:    domain.SenderUser,
-		SenderID:      "__system__",
-	}
-	return uc.publishRepo.SaveTx(ctx, dummyMsg, outbox)
+	return uc.outboxWriter.Save(ctx, outbox)
 }
 
 // natsSubject returns the NATS subject for a message based on its recipient type.

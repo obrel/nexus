@@ -75,9 +75,10 @@ var httpCmd = &cobra.Command{
 		groupRepo := mysql.NewGroupRepository(db)
 		userGroupRepo := mysql.NewUserGroupRepository(db)
 		userRepo := mysql.NewUserRepository(db)
+		outboxWriter := mysql.NewOutboxWriterRepository(db)
 
 		// Initialize use cases
-		msgUC, err := usecase.NewMessageUseCase(publishRepo, msgRepo, statusRepo, userGroupRepo, snowflakeGen, hashRing)
+		msgUC, err := usecase.NewMessageUseCase(publishRepo, msgRepo, statusRepo, userGroupRepo, outboxWriter, snowflakeGen, hashRing)
 		if err != nil {
 			log.Fatalf("Failed to initialize MessageUseCase: %v", err)
 			return
@@ -107,12 +108,18 @@ var httpCmd = &cobra.Command{
 			return
 		}
 
+		eventUC, err := usecase.NewEventUseCase(outboxWriter, userGroupRepo, snowflakeGen, hashRing)
+		if err != nil {
+			log.Fatalf("Failed to initialize EventUseCase: %v", err)
+			return
+		}
+
 		// Create and start HTTP server
 		server := httpsvr.New(&cfg.HTTP)
 
 		// Register routes
 		healthDeps := &httpsvr.HealthDeps{DB: db, RDB: rdb, NC: nc}
-		server.RegisterRoutes(msgUC, grpUC, profileUC, historyUC, authUC, cfg.App.ID, healthDeps)
+		server.RegisterRoutes(msgUC, grpUC, profileUC, historyUC, authUC, eventUC, cfg.App.ID, healthDeps)
 
 		// Start server in background
 		serverErr := make(chan error, 1)
