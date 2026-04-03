@@ -1207,14 +1207,76 @@ X-App-ID: myapp
             <section id="ws-overview">
                 <h2>WebSocket Integration</h2>
                 <p>Connection to the Egress tier is required to receive real-time updates. The Egress tier is
-                    responsible for pushing events to clients.</p>
+                    responsible for pushing real-time events to clients over a persistent WebSocket connection.</p>
 
                 <h3>Connection URL</h3>
-                <pre><code>ws://localhost:8081/ws</code></pre>
+                <pre><code>ws://&lt;egress-host&gt;:8081/ws</code></pre>
+
+                <h3>Authentication</h3>
+                <p>Nexus authenticates WebSocket connections using the
+                    <a href="https://www.rfc-editor.org/rfc/rfc6455#section-1.9" target="_blank">WebSocket subprotocol</a>
+                    mechanism. Browsers and most WebSocket clients do not allow custom headers during the upgrade
+                    handshake, so the JWT token is passed as a second subprotocol value alongside the base protocol
+                    identifier.</p>
+
+                <p>Send <strong>both</strong> of these values in the <code>Sec-WebSocket-Protocol</code> request
+                    header, in order:</p>
+                <ol>
+                    <li><code>nexus-v1</code> — the fixed protocol identifier</li>
+                    <li><code>&lt;jwt_token&gt;</code> — the Bearer token obtained from <a href="#auth">Authentication</a></li>
+                </ol>
+
+                <h3>Browser Example</h3>
+                <pre><code>const token = "eyJhbGci..."; // JWT from /v1/auth/login or /internal/v1/auth/register
+
+const ws = new WebSocket("wss://egress.example.com/ws", ["nexus-v1", token]);
+
+ws.addEventListener("open", () =&gt; {
+  console.log("Connected to Nexus");
+});
+
+ws.addEventListener("message", (ev) =&gt; {
+  const frame = JSON.parse(ev.data);
+  console.log(frame.event, frame.data);
+});
+
+ws.addEventListener("close", (ev) =&gt; {
+  console.log("Disconnected", ev.code, ev.reason);
+});</code></pre>
+
+                <h3>Native Client Example (Go)</h3>
+                <pre><code>import "github.com/gorilla/websocket"
+
+dialer := websocket.Dialer{
+    Subprotocols: []string{"nexus-v1", token},
+}
+conn, _, err := dialer.Dial("wss://egress.example.com/ws", nil)
+if err != nil {
+    log.Fatal(err)
+}</code></pre>
+
+                <h3>Connection Response</h3>
+                <p>On a successful upgrade, the server responds with:</p>
+                <pre><code>HTTP/1.1 101 Switching Protocols
+Sec-Websocket-Protocol: nexus-v1</code></pre>
+
+                <p>If authentication fails, the connection is rejected before the upgrade:</p>
+                <table>
+                    <thead>
+                        <tr><th>Status</th><th>Reason</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>401 Unauthorized</code></td>
+                            <td>Missing, malformed, or expired JWT; missing or invalid subprotocol header.</td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <div class="callout">
-                    <p><strong>Note:</strong> Authentication is typically handled via subprotocols or query parameters
-                        if headers are not supported by the client library during the handshake.</p>
+                    <p><strong>Note:</strong> After connecting, the client is automatically subscribed to its own
+                        private channel and to all groups it is a member of. No additional subscription message is
+                        needed.</p>
                 </div>
             </section>
 
