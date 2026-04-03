@@ -88,7 +88,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	protocols := websocket.Subprotocols(r)
 	tokenString, ok := extractToken(protocols)
 	if !ok {
-		http.Error(w, "missing or invalid sub-protocol", http.StatusBadRequest)
+		http.Error(w, "missing or invalid sub-protocol", http.StatusUnauthorized)
 		return
 	}
 
