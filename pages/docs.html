@@ -323,6 +323,7 @@
             <ul>
                 <li><a href="#auth">Authentication</a></li>
                 <li><a href="#messages">Messages</a></li>
+                <li><a href="#events">Events</a></li>
                 <li><a href="#groups">Groups</a></li>
                 <li><a href="#history">History</a></li>
                 <li><a href="#internal-api">Internal API</a></li>
@@ -839,6 +840,56 @@ def generate_nexus_jwt(jwt_secret: str, app_id: str, user_id: str) -> str:
 }</code></pre>
             </section>
 
+            <section id="events">
+                <h2>Events API</h2>
+                <p>Custom events allow you to broadcast transient application-level signals to a group or a specific
+                    user. Events are delivered in real-time via WebSocket and are <strong>not persisted</strong> to the
+                    database — they are queued in the outbox for at-least-once delivery and forwarded without storing a
+                    message record.</p>
+
+                <h3>Send Group Event</h3>
+                <p>The sender must be a member of the target group. Non-members receive
+                    <code>403 Forbidden</code> with error code <code>not_a_member</code>.</p>
+                <pre><code>POST /v1/events/send
+{
+  "group_id": "nexus_dev",
+  "content": {
+    "type": "USER_REACTION",
+    "value": { "message_id": "420158066278400", "emoji": "👍" }
+  }
+}
+
+// Response (202 Accepted)
+{
+  "success": true,
+  "data": {}
+}</code></pre>
+
+                <h3>Send Private Event</h3>
+                <p>Use <code>user_id</code> instead of <code>group_id</code> to send a custom event directly to a
+                    specific user. No membership check is required.</p>
+                <pre><code>POST /v1/events/send
+{
+  "user_id": "420158066212865",
+  "content": {
+    "type": "FRIEND_REQUEST",
+    "value": { "from": "420158066212864", "message": "Let's connect!" }
+  }
+}
+
+// Response (202 Accepted)
+{
+  "success": true,
+  "data": {}
+}</code></pre>
+
+                <div class="callout">
+                    <p><strong>Note:</strong> <code>group_id</code> and <code>user_id</code> are mutually exclusive —
+                        exactly one must be provided. <code>content.value</code> is optional; if provided it must be a
+                        JSON object. The <code>content.type</code> field becomes the <code>"event"</code> key in the
+                        downstream WebSocket envelope.</p>
+                </div>
+            </section>
 
             <section id="groups">
                 <h2>Groups API</h2>
@@ -1271,6 +1322,20 @@ X-App-ID: myapp
     "typing": false
   }
 }</code></pre>
+
+                <h3>Custom Event</h3>
+                <p>Application-level events sent via <code>POST /v1/events/send</code> arrive in the standard envelope.
+                    The <code>"event"</code> field is set to whatever <code>content.type</code> the sender specified;
+                    <code>"data"</code> is the optional <code>content.value</code> object (or <code>{}</code> if
+                    omitted).</p>
+                <pre><code>{
+  "event": "USER_REACTION",
+  "data": { "message_id": "420158066278400", "emoji": "👍" }
+}</code></pre>
+                <div class="callout">
+                    <p><strong>Note:</strong> Custom events are transient — they carry no <code>message_id</code> and
+                        are never stored. There is no acknowledgement mechanism for events.</p>
+                </div>
             </section>
 
             <section id="ws-indicators">
